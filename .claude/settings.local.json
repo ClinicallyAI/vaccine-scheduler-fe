@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "mcp__ide__getDiagnostics",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(for file in \"HealthScreeningFollowUp\" \"HealthScreeningStop\" \"HealthWarningDialog\" \"ProductRecommendationCard\" \"ServiceScreeningStop\" \"VaccineRecommendationModal\" \"ShinglesRecommendationModal\" \"BookingProgress\")",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)",
+      "Bash(for comp in ProductRecommendationCard ServiceScreeningStop VaccineRecommendationModal ShinglesRecommendationModal HealthWarningDialog)",
+      "Bash(do echo '=== $comp ===')"
     ],
     "deny": [],
     "ask": []

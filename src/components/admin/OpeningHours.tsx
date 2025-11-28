@@ -8,7 +8,6 @@ import { OpeningHours, DaySchedule, DEFAULT_OPENING_HOURS } from "@/types/pharma
 import { toast } from "sonner";
 import api from "@/services/axios";
 import { TENANT } from "@/services/auth";
-// import api from "@/services/axios";
 
 export default function OpeningHoursConfig() {
   const [hours, setHours] = useState<OpeningHours>(null);

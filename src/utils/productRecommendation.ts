@@ -57,23 +57,14 @@ export const submitProductRecommendationRequest = async (
   };
 
   // TODO: Replace with actual API endpoint when backend is ready
-  console.log("Product recommendation request payload:", payload);
-
   // Simulate API call
   return new Promise((resolve) => {
     setTimeout(() => {
-      console.log("Product recommendation request sent successfully");
       resolve();
     }, 1000);
   });
 };
 
 export const trackRecommendationClick = (serviceType: string, pharmacyName: string): void => {
-  // Analytics tracking
-  console.log("Product recommendation click tracked:", {
-    event: "product_recommendation_click",
-    serviceType,
-    pharmacyName,
-    timestamp: new Date().toISOString(),
-  });
+  // Analytics tracking - TODO: Implement actual analytics when backend is ready
 };

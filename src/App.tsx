@@ -1,5 +1,4 @@
 import React from "react";
-import ClinicallyHome from "./pages/ClinicallyHome";
 import ClinicallyHomeTwo from "./pages/ClinicallyHomeTwo";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -31,14 +30,6 @@ const App = () => {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
-              {/* <Route
-              path="/clinically-home"
-              element={
-                <PrivateRoute>
-                  <ClinicallyHome />
-                </PrivateRoute>
-              }
-            /> */}
               <Route
                 path="/clinically-home"
                 element={

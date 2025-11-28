@@ -110,9 +110,6 @@ const AdminDashboard = () => {
         description: "Failed to update pharmacy details.",
       });
     }
-    
-    console.log("Saving pharmacy data:", pharmacyData);
-    console.log("Saving business hours:", businessHours);
   };
 
   const saveBusinessHours = () => {
@@ -144,8 +141,6 @@ const AdminDashboard = () => {
         description: "Failed to update business hours.",
       });
     }
-    
-    console.log("Saving business hours:", businessHours);
   };
 
   return (

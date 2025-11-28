@@ -297,58 +297,6 @@ export const services: Service[] = [
   },
 ];
 
-export const healthScreeningQuestions: ScreeningQuestion[] = [
-  {
-    id: "vaccination4Weeks",
-    question: "I've had another vaccination in the last 4 weeks",
-    type: "checkbox",
-    required: false,
-    warningType: "passthrough",
-  },
-  {
-    id: "severeReaction",
-    question: "I've ever had a severe reaction to a vaccine",
-    type: "checkbox",
-    required: false,
-    warningType: "stop",
-  },
-  {
-    id: "allergies",
-    question: "I am seriously allergic to egg, rubber latex, neomycin or gelatin",
-    type: "checkbox",
-    required: false,
-    warningType: "stop",
-  },
-  {
-    id: "bloodThinners",
-    question: "I'm taking blood thinners or have bleeding problems",
-    type: "checkbox",
-    required: false,
-    warningType: "passthrough",
-  },
-  {
-    id: "pregnant",
-    question: "I am or could be pregnant",
-    type: "checkbox",
-    required: false,
-    warningType: "pregnancy",
-  },
-  {
-    id: "breastfeeding",
-    question: "I'm currently breastfeeding",
-    type: "checkbox",
-    required: false,
-    warningType: "passthrough",
-  },
-  {
-    id: "none",
-    question: "None of these apply to me",
-    type: "checkbox",
-    required: false,
-    warningType: "none",
-  },
-];
-
 export function getPharmacyBySlug(slug: string): Pharmacy | undefined {
   return pharmacyDataStore.find((pharmacy) => pharmacy.slug === slug);
 }
