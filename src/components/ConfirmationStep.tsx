@@ -6,6 +6,7 @@ import { Clock, Edit2 } from "lucide-react";
 import { format } from "date-fns";
 import { formatNZDate, formatNZTime } from "@/utils/time";
 import { normalizePhone } from "@/utils/phoneNumberClean";
+import api from "@/services/axios";
 
 interface ConfirmationStepProps {
   formData: BookingFormData;
@@ -57,16 +58,12 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ formData, pharmacy,
       setSubmitting(true);
       const endpoint =
         formData.appointment.type === "scheduled"
-          ? "https://sms-demo-fszn.onrender.com/book-appointment"
-          : "https://sms-demo-fszn.onrender.com/book-walk-in";
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+          ? "/book-appointment"
+          : "/book-walk-in";
+      const res = await api.post(endpoint, payload);
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = res.data;
+      if (res.status !== 200) {
         console.error("Booking failed:", data.error);
         alert("Failed to confirm booking. Please try again.");
         return;

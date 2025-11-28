@@ -40,8 +40,8 @@ const RescheduleBookings = () => {
   useEffect(() => {
     const fetchAvailability = async () => {
       try {
-        const res = await fetch(`https://sms-demo-fszn.onrender.com/bookings/availability/${token}`);
-        const data = await res.json();
+        const res = await api.get(`/bookings/availability/${token}`);
+        const data = res.data;
         setAvailability(flagLunchAsUnavailable(data.data?.availability, 4, data.data?.serviceId) || []);
 
         setPrevSlot(data.data?.prevSlot);
@@ -65,7 +65,7 @@ const RescheduleBookings = () => {
           slot_start: selectedTimeSlot.startTime,
         },
       };
-      await api.post("https://sms-demo-fszn.onrender.com/reschedule-appointment", payload);
+      await api.post("/reschedule-appointment", payload);
       alert("Your appointment has been rescheduled, you should receive an email shortly with the new appointment time.");
       setSubmitted(true);
     } catch (error: any) {

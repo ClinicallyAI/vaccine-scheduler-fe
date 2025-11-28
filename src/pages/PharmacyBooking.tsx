@@ -3,6 +3,7 @@ import { useParams, Navigate, useLocation } from "react-router-dom";
 import { TimeSlot, Pharmacy, Service, Recommendation } from "@/lib/types";
 import { getPharmacyId } from "@/utils/idToPharmacyNameMap";
 import { Badge } from "@/components/ui/badge";
+import api from "@/services/axios";
 import PharmacyHeader from "@/components/PharmacyHeader";
 import DynamicBookingProgress from "@/components/DynamicBookingProgress";
 import ServiceTypeSelection from "@/components/ServiceTypeSelection";
@@ -70,9 +71,8 @@ const PharmacyBooking = () => {
       if (!pharmacy && id) {
         setLoadingPharmacy(true);
         try {
-          const response = await fetch(`https://sms-demo-fszn.onrender.com/tenants/${id}`);
-          const result = await response.json();
-          setPharmacy(result.data[0]);
+          const response = await api.get(`/tenants/${id}`);
+          setPharmacy(response.data.data[0]);
         } catch (error) {
           console.error("Failed to fetch pharmacy:", error);
         } finally {
@@ -89,8 +89,8 @@ const PharmacyBooking = () => {
       if (!pharmacy?.id) return;
       setLoadingServices(true);
       try {
-        const response = await fetch(`https://sms-demo-fszn.onrender.com/services/${pharmacy.id}`);
-        const result = await response.json();
+        const response = await api.get(`/services/${pharmacy.id}`);
+        const result = response.data;
 
         // NEW: normalize recommendations to [{ serviceId: number }] and drop invalid/self refs
         const normalized: Service[] = (result.data ?? [])

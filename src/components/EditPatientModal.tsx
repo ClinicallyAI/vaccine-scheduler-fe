@@ -50,8 +50,6 @@ const EditPatientModal = ({ open, record, services, onClose, onUpdate }: EditPat
     status: record.status as RecordStatus,
     bookedDate: toInput(record.bookedDate),
   });
-  console.log(record);
-  console.log(typeof record.dob);
 
   // --- DOB handled as day / month / year ---
   const [day, setDay] = useState("");

@@ -22,8 +22,8 @@ const Index = () => {
   useEffect(() => {
     const fetchPharmacies = async () => {
       try {
-        const res = await api.get("https://sms-demo-fszn.onrender.com/tenants"); // adjust endpoint as needed
-        setPharmacies(res.data.data); // or res.data if that's how your backend returns
+        const res = await api.get("/tenants");
+        setPharmacies(res.data.data);
       } catch (err: any) {
         setError("Failed to load pharmacies.");
         console.error(err);

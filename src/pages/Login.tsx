@@ -1,7 +1,7 @@
-import axios from "axios";
 import { useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { setToken } from "@/services/auth";
+import api from "@/services/axios";
 
 const Login = () => {
   const [username, setUsername] = useState<string>("");
@@ -15,7 +15,7 @@ const Login = () => {
 
     try {
       const payload = { username, password };
-      const response = await axios.post("https://sms-demo-fszn.onrender.com/login", payload);
+      const response = await api.post("/login", payload);
 
       if (!response.data.data.token) {
         throw new Error("Login failed");

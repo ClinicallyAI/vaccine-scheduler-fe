@@ -22,8 +22,8 @@ const CancelBooking = () => {
   useEffect(() => {
     const fetchAvailability = async () => {
       try {
-        const res = await fetch(`https://sms-demo-fszn.onrender.com/bookings/availability/${token}`);
-        const data = await res.json();
+        const res = await api.get(`/bookings/availability/${token}`);
+        const data = res.data;
         setPrevSlot(data.data?.prevSlot);
       } catch (err) {
         console.error("Failed to load availability:", err);
@@ -41,7 +41,7 @@ const CancelBooking = () => {
       const payload = {
         token,
       };
-      await api.post("https://sms-demo-fszn.onrender.com/cancel-appointment", payload);
+      await api.post("/cancel-appointment", payload);
       alert("Your appointment has been cancelled, you should receive an email shortly with the cancellation.");
       setSubmitted(true);
     } catch (error: any) {
