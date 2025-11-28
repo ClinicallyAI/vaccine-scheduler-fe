@@ -1,0 +1,708 @@
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Edit, Trash2, Settings, Clock, DollarSign, Eye, EyeOff, Users, AlertTriangle } from "lucide-react";
+import { Staff, DEFAULT_OPENING_HOURS } from "@/types/pharmacy";
+import { toast } from "sonner";
+import { TENANT } from "@/services/auth";
+import api from "@/services/axios";
+
+type Service = {
+  id: string;
+  name: string;
+  description: string;
+  category: "vaccination" | "general"; // map from is_medical
+  duration: number; // map from duration_minutes
+  pricing: { type: "fixed" | "free" | "medication_additional"; amount?: number };
+  isActive: boolean; // map from is_active
+};
+
+export default function ServiceConfiguration() {
+  const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [activeTab, setActiveTab] = useState("vaccination");
+  const [formData, setFormData] = useState({
+    name: "",
+    category: "vaccination" as "vaccination" | "general",
+    duration: 15,
+    pricing: {
+      type: "fixed" as "fixed" | "free" | "medication_additional",
+      amount: 0,
+    },
+    description: "",
+    isActive: true,
+    assignedStaff: [] as string[],
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const [{ data: svcData }, { data: stData }] = await Promise.all([
+          api.get(`/tenants/${TENANT}/service`),
+          api.get(`/tenants/${TENANT}/staff`),
+        ]);
+        if (!mounted) return;
+        const svcRows = svcData?.data?.rows ?? [];
+        const stRows = stData?.data?.rows ?? [];
+        setServices(svcRows.map(mapServiceRow));
+        // normalize staff to our FE shape (already same as in Staff page)
+        const normStaff: Staff[] = (stRows || []).map((r: any) => ({
+          id: String(r.id),
+          name: r.name,
+          email: r.email ?? "",
+          phone: r.phone ?? "",
+          isActive: !!(r.isActive ?? r.is_active),
+          schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
+          serviceAssignments: (r.serviceAssignments ?? []).map(String),
+        }));
+        setStaff(normStaff);
+      } catch (err) {
+        console.error("Failed to load services/staff:", err);
+        toast.error("Failed to load services and staff");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  function mapServiceRow(row: any): Service {
+    const priceStr = (row.price ?? "").toString().trim();
+    const varies = !!row.price_is_varies;
+
+    let pricing: Service["pricing"];
+    if (varies) {
+      pricing = { type: "medication_additional" };
+    } else if (priceStr === "" || priceStr === "0" || priceStr === "0.00") {
+      pricing = { type: "free", amount: 0 };
+    } else {
+      const amt = Number.parseFloat(priceStr);
+      pricing = { type: "fixed", amount: Number.isFinite(amt) ? amt : 0 };
+    }
+
+    return {
+      id: String(row.id),
+      name: row.name,
+      description: row.description ?? "",
+      category: row.is_medical ? "vaccination" : "general",
+      duration: row.duration_minutes ?? 15,
+      pricing,
+      isActive: !!row.is_active,
+    };
+  }
+
+  function toServiceUpsertBody(svc: {
+    id?: string;
+    name: string;
+    description: string;
+    category: "vaccination" | "general";
+    duration: number;
+    pricing: { type: "fixed" | "free" | "medication_additional"; amount?: number };
+    isActive: boolean;
+    assignedStaff: string[];
+  }) {
+    // pricing -> price / price_is_varies
+    let price = "";
+    let price_is_varies = false;
+
+    if (svc.pricing.type === "fixed") {
+      const amt = typeof svc.pricing.amount === "number" ? svc.pricing.amount : 0;
+      price = amt.toFixed(2); // backend expects string
+    } else if (svc.pricing.type === "free") {
+      price = "0.00";
+    } else if (svc.pricing.type === "medication_additional") {
+      price_is_varies = true;
+      price = "0.00";
+    }
+
+    return {
+      ...(svc.id ? { id: Number(svc.id) } : {}),
+      tenant_id: TENANT, // you asked to reference TENANT directly
+      name: svc.name,
+      description: svc.description,
+      duration_minutes: svc.duration,
+      is_medical: svc.category === "vaccination",
+      is_active: svc.isActive,
+      price,
+      price_is_varies,
+      staffAssignments: svc.assignedStaff.map(Number), // backend uses join table
+    };
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      category: "vaccination",
+      duration: 15,
+      pricing: {
+        type: "fixed",
+        amount: 0,
+      },
+      description: "",
+      isActive: true,
+      assignedStaff: [],
+    });
+  };
+
+  const handleAddService = async () => {
+    if (!formData.name.trim()) return toast.error("Service name is required");
+    if (formData.isActive && formData.assignedStaff.length === 0) {
+      return toast.error("Active services must have at least one staff member assigned");
+    }
+
+    try {
+      setLoading(true);
+      const body = toServiceUpsertBody({
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        duration: formData.duration,
+        pricing: formData.pricing,
+        isActive: formData.isActive,
+        assignedStaff: formData.assignedStaff,
+      });
+      const { data } = await api.post(`/tenants/${TENANT}/service`, body);
+      const savedId = String(data?.data?.id ?? data?.id);
+      // refresh lists from server for truth
+      const [{ data: svcData }, { data: stData }] = await Promise.all([
+        api.get(`/tenants/${TENANT}/service`),
+        api.get(`/tenants/${TENANT}/staff`),
+      ]);
+      setServices((svcData?.data?.rows ?? []).map(mapServiceRow));
+      setStaff(
+        (stData?.data?.rows ?? []).map((r: any) => ({
+          id: String(r.id),
+          name: r.name,
+          email: r.email ?? "",
+          phone: r.phone ?? "",
+          isActive: !!(r.isActive ?? r.is_active),
+          schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
+          serviceAssignments: (r.serviceAssignments ?? []).map(String),
+        }))
+      );
+      setShowAddModal(false);
+      resetForm();
+      setHasChanges(true);
+      toast.success("Service added and staff assigned successfully!");
+    } catch (e) {
+      console.error("Add service failed:", e);
+      toast.error("Failed to add service");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditService = (service: Service) => {
+    // Get current staff assignments for this service
+    const assignedStaffIds = staff.filter((s) => s.serviceAssignments.includes(service.id)).map((s) => s.id);
+
+    setFormData({
+      name: service.name,
+      category: service.category,
+      duration: service.duration,
+      pricing: {
+        type: service.pricing.type,
+        amount: service.pricing.amount || 0,
+      },
+      description: service.description,
+      isActive: service.isActive,
+      assignedStaff: assignedStaffIds,
+    });
+    setEditingService(service);
+  };
+
+  const handleUpdateService = async () => {
+    if (!editingService) return;
+    if (!formData.name.trim()) return toast.error("Service name is required");
+    // if (formData.isActive && formData.assignedStaff.length === 0) {
+    //   return toast.error("Active services must have at least one staff member assigned");
+    // }
+
+    try {
+      setLoading(true);
+      const body = toServiceUpsertBody({
+        id: editingService.id,
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        duration: formData.duration,
+        pricing: formData.pricing,
+        isActive: formData.isActive,
+        assignedStaff: formData.assignedStaff,
+      });
+      await api.post(`/tenants/${TENANT}/service`, body);
+      // refresh from server
+      const [{ data: svcData }, { data: stData }] = await Promise.all([
+        api.get(`/tenants/${TENANT}/service`),
+        api.get(`/tenants/${TENANT}/staff`),
+      ]);
+      setServices((svcData?.data?.rows ?? []).map(mapServiceRow));
+      setStaff(
+        (stData?.data?.rows ?? []).map((r: any) => ({
+          id: String(r.id),
+          name: r.name,
+          email: r.email ?? "",
+          phone: r.phone ?? "",
+          isActive: !!(r.isActive ?? r.is_active),
+          schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
+          serviceAssignments: (r.serviceAssignments ?? []).map(String),
+        }))
+      );
+      setEditingService(null);
+      resetForm();
+      setHasChanges(true);
+      toast.success("Service updated successfully!");
+    } catch (e) {
+      console.error("Update service failed:", e);
+      toast.error("Failed to update service");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteService = async (serviceId: string) => {
+    if (!confirm("Are you sure you want to remove this service?")) return;
+    try {
+      setLoading(true);
+      await api.delete(`/tenants/${TENANT}/service/${serviceId}`);
+      // refresh from server
+      const [{ data: svcData }, { data: stData }] = await Promise.all([
+        api.get(`/tenants/${TENANT}/service`),
+        api.get(`/tenants/${TENANT}/staff`),
+      ]);
+      setServices((svcData?.data?.rows ?? []).map(mapServiceRow));
+      setStaff(
+        (stData?.data?.rows ?? []).map((r: any) => ({
+          id: String(r.id),
+          name: r.name,
+          email: r.email ?? "",
+          phone: r.phone ?? "",
+          isActive: !!(r.isActive ?? r.is_active),
+          schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
+          serviceAssignments: (r.serviceAssignments ?? []).map(String),
+        }))
+      );
+      setHasChanges(true);
+      toast.success("Service removed");
+    } catch (e) {
+      console.error("Delete service failed:", e);
+      toast.error("Failed to remove service");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAll = () => {
+    toast.success("Service configuration saved successfully!");
+    setHasChanges(false);
+  };
+  const getServicesByCategory = (category: "vaccination" | "general") => {
+    return services.filter((s) => s.category === category);
+  };
+  const getActiveServicesCount = (category?: "vaccination" | "general") => {
+    const filteredServices = category ? getServicesByCategory(category) : services;
+    return filteredServices.filter((s) => s.isActive).length;
+  };
+  const formatPrice = (pricing: Service["pricing"]) => {
+    if (pricing.type === "free") return "Free";
+    if (pricing.type === "medication_additional") return "Varies";
+    return `${(pricing.amount ?? 0).toFixed(2)}`;
+  };
+
+  // Get staff count for a service
+  const getServiceStaffCount = (serviceId: string) => {
+    return staff.filter((s) => s.serviceAssignments.includes(serviceId) && s.isActive).length;
+  };
+
+  // Get active staff members
+  const getActiveStaff = () => {
+    return staff.filter((s) => s.isActive);
+  };
+
+  // Handle staff assignment toggle
+  const handleStaffToggle = (staffId: string, checked: boolean) => {
+    if (checked) {
+      setFormData({
+        ...formData,
+        assignedStaff: [...formData.assignedStaff, staffId],
+      });
+    } else {
+      setFormData({
+        ...formData,
+        assignedStaff: formData.assignedStaff.filter((id) => id !== staffId),
+      });
+    }
+  };
+
+  // Select/Deselect all staff
+  const handleSelectAllStaff = () => {
+    const activeStaffIds = getActiveStaff().map((s) => s.id);
+    setFormData({
+      ...formData,
+      assignedStaff: activeStaffIds,
+    });
+  };
+
+  const handleClearAllStaff = () => {
+    setFormData({
+      ...formData,
+      assignedStaff: [],
+    });
+  };
+  const ServiceList = ({ category }: { category: "vaccination" | "general" }) => {
+    const categoryServices = getServicesByCategory(category);
+    const categoryLabel = category === "vaccination" ? "Vaccination" : "General";
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-medium">{categoryLabel} Services</h3>
+            <p className="text-sm text-muted-foreground">
+              {categoryServices.length} services • {getActiveServicesCount(category)} active
+            </p>
+          </div>
+        </div>
+
+        {categoryServices.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground border rounded-lg">
+            <Settings className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No {categoryLabel.toLowerCase()} services configured</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {categoryServices.map((service) => (
+              <div key={service.id} className="border rounded-lg p-4 bg-card">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-medium">{service.name}</h4>
+                      <Badge variant={service.isActive ? "default" : "secondary"}>{service.isActive ? "Active" : "Inactive"}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-1">{service.description}</p>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {service.duration} min
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" />
+                        {formatPrice(service.pricing)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {getServiceStaffCount(service.id)} staff
+                      </span>
+                      {service.isActive && getServiceStaffCount(service.id) === 0 && (
+                        <span className="flex items-center gap-1 text-destructive">
+                          <AlertTriangle className="h-3 w-3" />
+                          No staff assigned
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleEditService(service)}>
+                      <Edit className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteService(service.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Services</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {services.length} total services • {getActiveServicesCount()} active
+              </p>
+            </div>
+            <Button onClick={() => setShowAddModal(true)} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Service
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="vaccination">Vaccinations ({getServicesByCategory("vaccination").length})</TabsTrigger>
+              <TabsTrigger value="general">General Services ({getServicesByCategory("general").length})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="vaccination">
+              <ServiceList category="vaccination" />
+            </TabsContent>
+
+            <TabsContent value="general">
+              <ServiceList category="general" />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {hasChanges && (
+        <div className="flex justify-end">
+          <Button onClick={handleSaveAll} className="bg-primary hover:bg-primary/90">
+            Save All Changes
+          </Button>
+        </div>
+      )}
+
+      {/* Add/Edit Service Modal */}
+      <Dialog
+        open={showAddModal || !!editingService}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowAddModal(false);
+            setEditingService(null);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingService ? "Edit Service" : "Add Custom Service"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="serviceName">Service Name *</Label>
+                <Input
+                  id="serviceName"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      name: e.target.value,
+                    })
+                  }
+                  placeholder="Service name"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value: "vaccination" | "general") =>
+                    setFormData({
+                      ...formData,
+                      category: value,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border border-border z-50">
+                    <SelectItem value="vaccination">Vaccination</SelectItem>
+                    <SelectItem value="general">General Service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    description: e.target.value,
+                  })
+                }
+                placeholder="Service description"
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="5"
+                  max="120"
+                  value={formData.duration}
+                  disabled={true}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      duration: parseInt(e.target.value) || 15,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="pricingType">Pricing Type</Label>
+                <Select
+                  value={formData.pricing.type}
+                  onValueChange={(value: "fixed" | "free" | "medication_additional") =>
+                    setFormData({
+                      ...formData,
+                      pricing: {
+                        ...formData.pricing,
+                        type: value,
+                      },
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border border-border z-50">
+                    <SelectItem value="fixed">Fixed Price</SelectItem>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="medication_additional">Varies</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {formData.pricing.type === "fixed" && (
+              <div>
+                <Label htmlFor="amount">Price ($)</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.pricing.amount || 0}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      pricing: {
+                        ...formData.pricing,
+                        amount: parseFloat(e.target.value) || 0,
+                      },
+                    })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={formData.isActive}
+                  onCheckedChange={(checked) =>
+                    setFormData({
+                      ...formData,
+                      isActive: checked,
+                    })
+                  }
+                />
+                <Label>Active Service (Available for Online Booking)</Label>
+              </div>
+            </div>
+
+            {/* Staff Assignment Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base font-medium">Assign Staff Members</Label>
+                  <p className="text-sm text-muted-foreground">Select which staff members can provide this service</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={handleSelectAllStaff} disabled={getActiveStaff().length === 0}>
+                    Select All
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={handleClearAllStaff}>
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+
+              {getActiveStaff().length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                  <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No active staff members available</p>
+                  <p className="text-xs">Add staff members in the Staff Management section</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-lg p-3">
+                  {getActiveStaff().map((staffMember) => (
+                    <div key={staffMember.id} className="flex items-center space-x-3 p-2 border rounded-lg bg-card">
+                      <Checkbox
+                        id={`staff-${staffMember.id}`}
+                        checked={formData.assignedStaff.includes(staffMember.id)}
+                        onCheckedChange={(checked) => handleStaffToggle(staffMember.id, checked as boolean)}
+                      />
+                      <div className="flex-1">
+                        <Label htmlFor={`staff-${staffMember.id}`} className="text-sm font-medium cursor-pointer">
+                          {staffMember.name}
+                        </Label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* {formData.isActive && formData.assignedStaff.length === 0 && (
+                <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <p className="text-sm text-destructive">Active services must have at least one staff member assigned</p>
+                </div>
+              )} */}
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingService(null);
+                  resetForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={editingService ? handleUpdateService : handleAddService} className="bg-primary hover:bg-primary/90">
+                {editingService ? "Update Service" : "Add Service"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
