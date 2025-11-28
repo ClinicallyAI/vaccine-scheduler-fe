@@ -75,8 +75,12 @@ const EditPatientModal = ({ open, record, services, onClose, onUpdate }: EditPat
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!day || !month || !year) {
-      setDobError("Date of birth is required");
+    // Validate that if any DOB field is filled, all must be filled
+    const hasAnyDob = day || month || year;
+    const hasAllDob = day && month && year;
+
+    if (hasAnyDob && !hasAllDob) {
+      setDobError("Please complete all date of birth fields or leave them all empty");
       return;
     }
 
@@ -164,7 +168,7 @@ const EditPatientModal = ({ open, record, services, onClose, onUpdate }: EditPat
 
             {/* DOB with Day / Month / Year selects */}
             <div className="space-y-3">
-              <Label className="text-base font-medium">Date of Birth</Label>
+              <Label className="text-base font-medium">Date of Birth <span className="text-gray-500 font-normal">(optional)</span></Label>
               <div className="grid grid-cols-[1fr_2fr_1fr] gap-2">
                 {/* Day */}
                 <Select
