@@ -1,5 +1,5 @@
 import React from "react";
-import ClinicallyHomeTwo from "./pages/ClinicallyHomeTwo";
+import ClinicallyHome from "./pages/ClinicallyHome";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,7 +34,7 @@ const App = () => {
                 path="/clinically-home"
                 element={
                   <PrivateRoute>
-                    <ClinicallyHomeTwo />
+                    <ClinicallyHome />
                   </PrivateRoute>
                 }
               />
