@@ -8,6 +8,7 @@ import { formatNZTime } from "@/utils/time";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
 import api from "@/services/axios";
+import { MULTIPLE_VACCINE_SERVICE_IDS } from "@/constants";
 
 interface AppointmentBookingProps {
   formData: BookingFormData;
@@ -49,7 +50,9 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({
 
   const selectedServices = allServices.filter((s) => formData.services.includes(String(s.id)));
 
-  const isMultipleVaccines = selectedServices.length > 1 && selectedServices.every((service) => ["1", "2"].includes(String(service.id))); // IDs likely numeric, coerced to string
+  const isMultipleVaccines = selectedServices.length > 1 && selectedServices.every((service) =>
+    MULTIPLE_VACCINE_SERVICE_IDS.includes(String(service.id) as any)
+  );
 
   const totalDuration = selectedServices[0]?.duration_minutes ?? 15;
 

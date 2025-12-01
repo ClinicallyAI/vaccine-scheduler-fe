@@ -1,39 +1,15 @@
-import { DateTime } from "luxon";
+import { format, getHours, getMinutes, getDay } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+import {
+  NZ_TIMEZONE,
+  BLOCKED_NZ_DATES,
+  HOLIDAY_OPEN_WINDOWS,
+  TENANT_IDS,
+  TENANT_4_SATURDAY_ALLOWED_SERVICE_IDS
+} from "@/constants";
 
-const NZ_TZ = "Pacific/Auckland";
-
-/** Dates that are closed for everyone by default (NZ time) */
-const BLOCKED_NZ_DATES = new Set<string>([
-  "2025-10-27", // Labour Day
-  "2025-12-25", // Christmas Day
-  "2026-01-01", // New Year's Day
-  "2026-01-02", // Day after New Year's
-]);
-
-/**
- * Holiday exceptions: per date -> per tenantId -> allowed time windows (NZ local).
- * Times are [start, end) in 24h "HH:mm".
- *
- * Mappings provided:
- *  "vercoe-road-pharmacy": 3,
- *  "unichem-milford": 4,
- *  "devonport-7-day": 5,
- *  "mangawhai-pharmacy": 6,
- *  "unichem-russell-street": 7,
- *  "unichem-putaruru": 8,
- *  "gilmours-pharmacy-havelock-north": 9,
- */
-const HOLIDAY_OPEN_WINDOWS: Record<string, Record<number, [string, string][]>> = {
-  // Labour Day
-  "2025-10-27": {
-    5: [["10:00", "16:00"]], // Devonport 7 Day
-    7: [["09:00", "15:00"]], // Unichem Russell Street
-  },
-  // Christmas & New Year
-  "2025-12-25": { 7: [["09:00", "15:00"]] },
-  "2026-01-01": { 7: [["09:00", "15:00"]] },
-  "2026-01-02": { 7: [["09:00", "15:00"]] },
-};
+const NZ_TZ = NZ_TIMEZONE;
+const BLOCKED_NZ_DATES_SET = new Set<string>(BLOCKED_NZ_DATES);
 
 function inAnyWindow(minutes: number, windows: [string, string][]): boolean {
   return windows.some(([from, to]) => {
@@ -51,12 +27,12 @@ export function flagLunchAsUnavailable(availability, tenantId, serviceId) {
   return availability.map((day) => ({
     ...day,
     timeSlots: day.timeSlots.map((ts) => {
-      const start = DateTime.fromISO(ts.startTime).setZone(NZ_TZ);
-      const nzDate = start.toISODate(); // "YYYY-MM-DD"
-      const minutes = start.hour * 60 + start.minute;
+      const start = toZonedTime(new Date(ts.startTime), NZ_TZ);
+      const nzDate = format(start, 'yyyy-MM-dd'); // "YYYY-MM-DD"
+      const minutes = getHours(start) * 60 + getMinutes(start);
 
       // --- Holiday rules (apply to ALL tenants first) ---
-      if (nzDate && BLOCKED_NZ_DATES.has(nzDate)) {
+      if (nzDate && BLOCKED_NZ_DATES_SET.has(nzDate)) {
         const allowed = HOLIDAY_OPEN_WINDOWS[nzDate]?.[tid] ?? [];
         // If tenant has no special window, or slot isn't inside a window -> unavailable
         if (allowed.length === 0 || !inAnyWindow(minutes, allowed)) {
@@ -66,17 +42,19 @@ export function flagLunchAsUnavailable(availability, tenantId, serviceId) {
       }
 
       // --- Existing rules ---
-      const isWeekday = start.weekday >= 1 && start.weekday <= 5;
+      // Convert date-fns getDay (0=Sun, 6=Sat) to luxon weekday format (1=Mon, 7=Sun)
+      const weekday = getDay(start) === 0 ? 7 : getDay(start);
+      const isWeekday = weekday >= 1 && weekday <= 5;
 
-      // Rule 1: Tenant 4 → make 12:00–12:59 unavailable Mon–Fri
-      if (tid === 4) {
+      // Rule 1: Tenant 4 (Unichem Milford) → make 12:00–12:59 unavailable Mon–Fri
+      if (tid === TENANT_IDS.UNICHEM_MILFORD) {
         const inLunchWindow = isWeekday && minutes >= 12 * 60 && minutes < 13 * 60;
         if (inLunchWindow) {
           return { ...ts, available: false };
         }
 
-        // Rule 2: If serviceId NOT in list → make Saturday unavailable
-        if (![150, 152, 153, 154, 155, 156, 157].includes(Number(serviceId)) && start.weekday === 6) {
+        // Rule 2: If serviceId NOT in allowed list → make Saturday unavailable
+        if (!TENANT_4_SATURDAY_ALLOWED_SERVICE_IDS.includes(Number(serviceId)) && weekday === 6) {
           return { ...ts, available: false };
         }
       }

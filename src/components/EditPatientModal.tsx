@@ -6,8 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ServiceRecord } from "@/types/serviceRecords";
 import { useAgeCalculation } from "@/hooks/useAgeCalculation";
-
-type RecordStatus = "Reminder Scheduled" | "Sent" | "Overdue" | "Booked" | "Completed" | "Did not Attend" | "Walk-in";
+import { RecordStatus, ALL_RECORD_STATUSES } from "@/constants";
 
 type ServiceInfo = { id: number; name: string; isMedical?: boolean };
 
@@ -18,8 +17,6 @@ interface EditPatientModalProps {
   onClose: () => void;
   onUpdate: (updated: Partial<ServiceRecord> & { id: string }) => void;
 }
-
-const STATUS_OPTIONS: RecordStatus[] = ["Reminder Scheduled", "Sent", "Overdue", "Booked", "Completed", "Did not Attend", "Walk-in"];
 
 const toInput = (value?: string | Date | null) => {
   if (!value) return "";
@@ -256,7 +253,7 @@ const EditPatientModal = ({ open, record, services, onClose, onUpdate }: EditPat
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((s) => (
+                  {ALL_RECORD_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
                       {s}
                     </SelectItem>

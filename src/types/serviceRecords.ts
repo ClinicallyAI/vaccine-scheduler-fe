@@ -1,3 +1,5 @@
+import { RecordStatus } from "@/constants";
+
 export interface ServiceRecord {
   id: string;
   patientName: string;
@@ -14,6 +16,7 @@ export interface ServiceRecord {
   dob?: Date | null;
 }
 
-export type RecordStatus = "Reminder Scheduled" | "Sent" | "Overdue" | "Booked" | "Completed" | "Did not Attend" | "Walk-in";
+// Re-export for convenience
+export type { RecordStatus };
 
 export type BookingStatus = "Booked" | "Completed" | "Did not Attend" | "Walk-in";
