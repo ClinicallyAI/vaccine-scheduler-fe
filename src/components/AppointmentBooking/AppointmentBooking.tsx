@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { format, addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { BookingFormData, TimeSlot, Pharmacy, Service } from "@/lib/types";
 import { flagLunchAsUnavailable } from "@/utils/availabilityOverride";
 import { formatNZTime } from "@/utils/time";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { Label } from "./ui/label";
 import api from "@/services/axios";
 import { MULTIPLE_VACCINE_SERVICE_IDS } from "@/constants";
+import AppointmentTypeSelector from "./AppointmentTypeSelector";
+import DateSelector from "./DateSelector";
+import TimeSlotSelector from "./TimeSlotSelector";
+import WalkInInfo from "./WalkInInfo";
+import AppointmentSummary from "./AppointmentSummary";
 
 interface AppointmentBookingProps {
   formData: BookingFormData;
@@ -233,72 +235,6 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({
     );
   };
 
-  const renderTimeSlots = () => {
-    if (!selectedDate) {
-      return (
-        <div className="border rounded-md p-8 text-center">
-          <p className="text-gray-500">Please select a date to see available time slots.</p>
-        </div>
-      );
-    }
-
-    if (loadingAvailability) {
-      return (
-        <div className="border rounded-md p-8 text-center">
-          <p className="text-gray-500">Loading available time slots...</p>
-        </div>
-      );
-    }
-
-    if (timeSlots.length === 0) {
-      return (
-        <div className="border rounded-md p-8 text-center">
-          <p className="text-gray-500">No available appointments on this date. Please select another date.</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="border rounded-md p-4 grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
-        {timeSlots.map((timeSlot, index) => (
-          <Button
-            key={index}
-            variant={selectedTimeSlot === timeSlot ? "default" : "outline"}
-            className={selectedTimeSlot === timeSlot ? "border-2 border-primary" : ""}
-            onClick={() => handleTimeSlotSelect(timeSlot)}
-          >
-            {formatNZTime(timeSlot.startTime)}
-          </Button>
-        ))}
-      </div>
-    );
-  };
-
-  const renderAppointmentSummary = () => {
-    if (!selectedDate || !selectedTimeSlot) return null;
-
-    return (
-      <div className="bg-primary/10 p-4 rounded-md mb-6">
-        <h3 className="font-medium text-primary mb-2">Your selected appointment</h3>
-        <p>
-          <span className="font-semibold">Date:</span> {format(selectedDate, "EEEE, MMMM d, yyyy")}
-        </p>
-        <p>
-          <span className="font-semibold">Time:</span> {formatNZTime(selectedTimeSlot.startTime)} - {formatNZTime(selectedTimeSlot.endTime)}
-        </p>
-
-        <p>
-          <span className="font-semibold">Duration:</span> {totalDuration} minutes
-        </p>
-        {selectedServices.length > 1 && (
-          <p>
-            <span className="font-semibold">Services:</span> {selectedServices.map((s) => s.name).join(" + ")}
-          </p>
-        )}
-        {isMultipleVaccines && <p className="text-sm text-gray-600 mt-1">Both vaccines can be administered in one 15-minute appointment</p>}
-      </div>
-    );
-  };
 
   return (
     <div className="animate-fade-in max-w-4xl mx-auto">
@@ -308,83 +244,47 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({
         {selectedServices.length > 1 && ` (${totalDuration} minutes total)`}
       </p>
 
-      {/* Appointment Type Selection */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-4">Choose appointment type</h3>
-        <RadioGroup value={appointmentType} onValueChange={handleAppointmentTypeChange} className="space-y-4">
-          <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
-            <RadioGroupItem value="scheduled" id="scheduled" />
-            <Label htmlFor="scheduled" className="flex-1 cursor-pointer">
-              <div className="font-medium">Select date and time</div>
-              <div className="text-sm text-muted-foreground">Schedule your appointment for a guaranteed time slot</div>
-            </Label>
-          </div>
-          {[1, 2, 4].includes(Number(pharmacy.id)) && (
-            <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
-              <RadioGroupItem value="walk-in" id="walk-in" />
-              <Label htmlFor="walk-in" className="flex-1 cursor-pointer">
-                <div className="font-medium">Walk-in (Select only if you are at the Pharmacy)</div>
-                <div className="text-sm text-muted-foreground">Come in during business hours - no appointment needed</div>
-              </Label>
-            </div>
-          )}
-        </RadioGroup>
-      </div>
+      <AppointmentTypeSelector
+        appointmentType={appointmentType}
+        onTypeChange={handleAppointmentTypeChange}
+        pharmacyId={Number(pharmacy.id)}
+      />
 
       {appointmentType === "scheduled" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Date Selection */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">1. Select a date</h3>
-            <div className="border rounded-md p-4">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={handleDateSelect}
-                disabled={isDateDisabled}
-                className="pointer-events-auto"
-              />
-            </div>
-            {selectedDate && <div className="mt-2 text-sm text-gray-500">Business hours: {getBusinessHoursForDate(selectedDate)}</div>}
-          </div>
+          <DateSelector
+            selectedDate={selectedDate}
+            onDateSelect={handleDateSelect}
+            isDateDisabled={isDateDisabled}
+            getBusinessHours={getBusinessHoursForDate}
+          />
 
-          {/* Time Selection */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">2. Select a time</h3>
-            {renderTimeSlots()}
-          </div>
+          <TimeSlotSelector
+            selectedDate={selectedDate}
+            selectedTimeSlot={selectedTimeSlot}
+            timeSlots={timeSlots}
+            loading={loadingAvailability}
+            onTimeSlotSelect={handleTimeSlotSelect}
+          />
         </div>
       ) : (
-        <div className="mb-8 p-6 border rounded-lg bg-accent/20">
-          <h3 className="text-lg font-semibold mb-3">Walk-in Information</h3>
-          <div className="space-y-2 text-sm">
-            <p>
-              <span className="font-medium">Business Hours:</span> {getBusinessHours()}
-            </p>
-            <p>
-              <span className="font-medium">Expected Duration:</span> {totalDuration} minutes
-            </p>
-            <p>
-              <span className="font-medium">Current Status:</span>
-              <span className={isPharmacyOpen() ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                {isPharmacyOpen() ? " Open now" : " Currently closed"}
-              </span>
-            </p>
-            {getWalkInValidationMessage() && (
-              <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-xs">
-                {getWalkInValidationMessage()}
-              </div>
-            )}
-            <p className="text-muted-foreground">
-              No appointment necessary. Please arrive during business hours and our team will assist you as soon as possible.
-            </p>
-          </div>
-        </div>
+        <WalkInInfo
+          businessHours={getBusinessHours()}
+          totalDuration={totalDuration}
+          isPharmacyOpen={isPharmacyOpen()}
+          validationMessage={getWalkInValidationMessage()}
+        />
       )}
 
       {/* Appointment Summary and Navigation */}
       <div className="mt-8">
-        {renderAppointmentSummary()}
+        <AppointmentSummary
+          selectedDate={selectedDate}
+          selectedTimeSlot={selectedTimeSlot}
+          totalDuration={totalDuration}
+          selectedServices={selectedServices}
+          isMultipleVaccines={isMultipleVaccines}
+        />
 
         <div className="flex justify-between pt-4">
           <Button type="button" variant="outline" onClick={onPrevStep}>

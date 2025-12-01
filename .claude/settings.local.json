@@ -7,7 +7,9 @@
       "Bash(do echo \"=== $file ===\")",
       "Bash(done)",
       "Bash(for comp in ProductRecommendationCard ServiceScreeningStop VaccineRecommendationModal ShinglesRecommendationModal HealthWarningDialog)",
-      "Bash(do echo '=== $comp ===')"
+      "Bash(do echo '=== $comp ===')",
+      "Bash(mkdir:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []
