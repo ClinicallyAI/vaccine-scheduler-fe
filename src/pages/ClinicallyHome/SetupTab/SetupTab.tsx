@@ -1,8 +1,15 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Clock, Users, Folder } from "lucide-react";
+import { TENANT } from "@/services/auth";
 
 const SetupTab: React.FC = () => {
+  const navigate = useNavigate();
+  const tenantId = Number(TENANT);
+  const showAdminButton = tenantId === 2 || tenantId === 10;
+
   return (
     <Card>
       <CardHeader>
@@ -11,6 +18,7 @@ const SetupTab: React.FC = () => {
             <CardTitle>Patient booking system</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">Configure your pharmacy's booking system</p>
           </div>
+          {showAdminButton && <Button onClick={() => navigate("/clinically-home/admin-setup")}>Admin Setup</Button>}
         </div>
       </CardHeader>
       <CardContent>
