@@ -33,16 +33,10 @@ export const VACCINATION_SERVICE_IDS = [
   SERVICE_IDS.MENINGOCOCCAL,
 ] as const;
 
-export const GENERAL_SERVICE_IDS = [
-  SERVICE_IDS.EAR_PIERCING,
-  SERVICE_IDS.PASSPORT_PHOTO,
-] as const;
+export const GENERAL_SERVICE_IDS = [SERVICE_IDS.EAR_PIERCING, SERVICE_IDS.PASSPORT_PHOTO] as const;
 
 // Multiple vaccine service IDs (flu + covid combo)
-export const MULTIPLE_VACCINE_SERVICE_IDS = [
-  SERVICE_IDS.FLU,
-  SERVICE_IDS.COVID,
-] as const;
+export const MULTIPLE_VACCINE_SERVICE_IDS = [SERVICE_IDS.FLU, SERVICE_IDS.COVID] as const;
 
 // ========================================
 // Tenant/Pharmacy IDs
@@ -55,6 +49,7 @@ export const TENANT_IDS = {
   UNICHEM_RUSSELL_STREET: 7,
   UNICHEM_PUTARURU: 8,
   GILMOURS_HAVELOCK_NORTH: 9,
+  IPG_PHARMACY: 10,
 } as const;
 
 // ========================================
@@ -70,7 +65,7 @@ export const RECORD_STATUSES = {
   WALK_IN: "Walk-in",
 } as const;
 
-export type RecordStatus = typeof RECORD_STATUSES[keyof typeof RECORD_STATUSES];
+export type RecordStatus = (typeof RECORD_STATUSES)[keyof typeof RECORD_STATUSES];
 
 export const ALL_RECORD_STATUSES = Object.values(RECORD_STATUSES);
 

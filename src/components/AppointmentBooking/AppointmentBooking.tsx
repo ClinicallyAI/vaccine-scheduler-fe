@@ -52,9 +52,8 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({
 
   const selectedServices = allServices.filter((s) => formData.services.includes(String(s.id)));
 
-  const isMultipleVaccines = selectedServices.length > 1 && selectedServices.every((service) =>
-    MULTIPLE_VACCINE_SERVICE_IDS.includes(String(service.id) as any)
-  );
+  const isMultipleVaccines =
+    selectedServices.length > 1 && selectedServices.every((service) => MULTIPLE_VACCINE_SERVICE_IDS.includes(String(service.id) as any));
 
   const totalDuration = selectedServices[0]?.duration_minutes ?? 15;
 
@@ -64,7 +63,7 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({
       try {
         setLoadingAvailability(true);
         let response;
-        if (Number(pharmacy.id) === 2) {
+        if (Number(pharmacy.id) === 2 || Number(pharmacy.id) === 10) {
           response = await api.post(`/tenants/${pharmacy.id}/service/availability`, { serviceId: selectedServices[0]?.id });
         } else {
           response = await api.get(`/tenants/${pharmacy.id}/availability`);
@@ -234,7 +233,6 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({
       date < today || date > ninetyThreeDaysFromNow || !availableDates.some((d) => format(d, "yyyy-MM-dd") === format(date, "yyyy-MM-dd"))
     );
   };
-
 
   return (
     <div className="animate-fade-in max-w-4xl mx-auto">

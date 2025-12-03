@@ -11,6 +11,7 @@ export const pharmacyNameToId: Record<string, string> = {
   "unichem-russell-street": "7",
   "unichem-putaruru": "8",
   "gilmours-pharmacy-havelock-north": "9",
+  "ipg-pharmacy": "10",
 };
 
 // id → name (reverse map)

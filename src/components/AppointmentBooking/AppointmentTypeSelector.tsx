@@ -8,11 +8,7 @@ interface AppointmentTypeSelectorProps {
   pharmacyId: number;
 }
 
-const AppointmentTypeSelector: React.FC<AppointmentTypeSelectorProps> = ({
-  appointmentType,
-  onTypeChange,
-  pharmacyId,
-}) => {
+const AppointmentTypeSelector: React.FC<AppointmentTypeSelectorProps> = ({ appointmentType, onTypeChange, pharmacyId }) => {
   return (
     <div className="mb-8">
       <h3 className="text-lg font-semibold mb-4">Choose appointment type</h3>
@@ -24,7 +20,7 @@ const AppointmentTypeSelector: React.FC<AppointmentTypeSelectorProps> = ({
             <div className="text-sm text-muted-foreground">Schedule your appointment for a guaranteed time slot</div>
           </Label>
         </div>
-        {[1, 2, 4].includes(Number(pharmacyId)) && (
+        {[1, 2, 4, 10].includes(Number(pharmacyId)) && (
           <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
             <RadioGroupItem value="walk-in" id="walk-in" />
             <Label htmlFor="walk-in" className="flex-1 cursor-pointer">
