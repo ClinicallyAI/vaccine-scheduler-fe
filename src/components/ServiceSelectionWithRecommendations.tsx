@@ -83,7 +83,7 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
 
       // Only use vaccine recommendations for tenantId "2"
       // For other tenants, call the endpoint but don't use the response
-      if (String(tenantId) !== "2") {
+      if (!["10", "2"].includes(String(tenantId))) {
         // Still call the endpoint for tracking/testing purposes
         try {
           await getVaccineRecommendations(String(tenantId), dateOfBirth, isPregnant);
