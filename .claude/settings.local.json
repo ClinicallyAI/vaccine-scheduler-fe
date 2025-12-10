@@ -9,7 +9,8 @@
       "Bash(for comp in ProductRecommendationCard ServiceScreeningStop VaccineRecommendationModal ShinglesRecommendationModal HealthWarningDialog)",
       "Bash(do echo '=== $comp ===')",
       "Bash(mkdir:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

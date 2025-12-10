@@ -19,7 +19,7 @@ export function useVersionCheck() {
           }
         }
       } catch (err) {
-        console.error("Version check failed:", err);
+        // Version check failed
       }
     };
 

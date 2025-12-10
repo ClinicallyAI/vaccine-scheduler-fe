@@ -26,7 +26,7 @@ export interface Staff {
   phone: string;
   isActive: boolean;
   schedule: OpeningHours; // Individual staff schedule
-  serviceAssignments: string[]; // Array of service IDs assigned to this staff member
+  serviceAssignments: string[]; // @deprecated - Staff assignments now managed via Service.staff_ids. This field is maintained for backward compatibility but not used.
 }
 
 export interface StaffConfig {

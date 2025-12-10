@@ -80,7 +80,6 @@ const ClinicallyHome: React.FC = () => {
   // Derived
   const todaysBookings = useMemo(() => {
     const todayNZ = getNZTodayISO();
-
     return records
       .filter((r) => {
         const bookedKey = nzDayKey(r.bookedDate);
@@ -144,7 +143,7 @@ const ClinicallyHome: React.FC = () => {
         .map((s: any) => ({ id: s.id, name: s.name, isMedical: !!s.is_medical }));
       setServices(list);
     } catch (err) {
-      console.error("Failed to load services:", err);
+      // Failed to load services
     } finally {
       endLoad();
     }
@@ -172,7 +171,7 @@ const ClinicallyHome: React.FC = () => {
       }));
       setRecords(normalized);
     } catch (err) {
-      console.error("Error loading records:", err);
+      // Error loading records
     } finally {
       endLoad();
     }
@@ -232,7 +231,6 @@ const ClinicallyHome: React.FC = () => {
       toast.success("Patient added");
       closeModals();
     } catch (err) {
-      console.error(err);
       throw err; // let caller toast
     } finally {
       endLoad();
@@ -264,7 +262,7 @@ const ClinicallyHome: React.FC = () => {
       await fetchRecords();
       closeModals();
     } catch (err: any) {
-      console.error(err);
+      // Error creating record
     } finally {
       endLoad();
     }
@@ -307,7 +305,6 @@ const ClinicallyHome: React.FC = () => {
       toast.success("Patient edited");
       closeModals();
     } catch (err) {
-      console.error(err);
       throw err; // let callers toast/rollback
     } finally {
       endLoad();
@@ -363,7 +360,6 @@ const ClinicallyHome: React.FC = () => {
       ...partial,
     };
   }
-
 
   // ---------- Modals ----------
   function openAdd() {
@@ -436,15 +432,13 @@ const ClinicallyHome: React.FC = () => {
       if (next === "Completed") {
         const row = recordById[id];
         if (!row) {
-          console.warn("Active record not found for id:", id);
-          toast.error("Couldn’t open next reminder — record not found.");
+          toast.error("Couldn't open next reminder — record not found.");
         } else {
           setActiveRecord(row);
           setNextScheduleOpen(true);
         }
       }
     } catch (e) {
-      console.error(e);
       // rollback on failure
       setPendingStatus((s) => ({ ...s, [id]: prev }));
       toast.error("Failed to update status");
@@ -515,9 +509,7 @@ const ClinicallyHome: React.FC = () => {
         </Tabs>
       </div>
 
-      {hoveredRow && recordById[hoveredRow] && (
-        <PatientInfoTooltip record={recordById[hoveredRow]} position={tooltipPosition} />
-      )}
+      {hoveredRow && recordById[hoveredRow] && <PatientInfoTooltip record={recordById[hoveredRow]} position={tooltipPosition} />}
 
       {/* ----- Edit Modal (stub) ----- */}
       {activeRecord && (

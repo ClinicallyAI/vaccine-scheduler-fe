@@ -64,14 +64,12 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ formData, pharmacy,
 
       const data = res.data;
       if (res.status !== 200) {
-        console.error("Booking failed:", data.error);
         alert("Failed to confirm booking. Please try again.");
         return;
       }
 
       onConfirm(); // Proceed to confirmation screen
     } catch (err) {
-      console.error("Error confirming booking:", err);
       alert("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);

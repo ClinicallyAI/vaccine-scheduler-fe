@@ -72,7 +72,6 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({
           setRawAvailability(response.data?.data?.availability ?? []);
         }
       } catch (err) {
-        console.error("Failed to load availability:", err);
         if (!cancelled) setRawAvailability([]);
       } finally {
         if (!cancelled) setLoadingAvailability(false);

@@ -38,8 +38,16 @@ export interface Service {
   price?: number;
   price_is_varies: boolean;
   is_active?: boolean;
+  service_type?: 'vaccination' | 'general';
+  staff_ids?: string[]; // Staff members assigned to this service (from backend)
   screeningQuestions: ScreeningQuestion[];
   recommendations: Recommendation[];
+  recommendationStatus?: 'funded' | 'fees_apply' | 'eligibility_confirmed';
+  matchedRule?: {
+    ruleName: string;
+    criteriaType: string;
+    status: string;
+  };
 }
 
 export interface ScreeningQuestion {

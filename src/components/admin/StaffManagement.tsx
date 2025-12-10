@@ -10,15 +10,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Edit, Trash2, User, Clock, Stethoscope } from "lucide-react";
 import { Staff, OpeningHours, DEFAULT_OPENING_HOURS } from "@/types/pharmacy";
-import { Service } from "@/lib/types";
 import TimeInput from "./TimeInput";
 import { toast } from "sonner";
 import { TENANT } from "@/services/auth";
 import api from "@/services/axios";
+import { useServices } from "@/hooks/useServices";
 
 export default function StaffManagement() {
-  // Initialize services from predefined list
-  const [services, setServices] = useState<Service[]>([]);
+  // Use the shared services hook for fetching and combining data (auto-fetch on mount)
+  const { services, loading: servicesLoading, fetchServices, clearCache, getStaffServices: getStaffServicesFromHook } = useServices(true);
+
   const [staff, setStaff] = useState<Staff[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -74,43 +75,28 @@ export default function StaffManagement() {
     7: "Sunday",
   };
 
+  // Fetch staff on mount (services are auto-fetched by the hook)
   useEffect(() => {
-    fetchServices();
-    fetchStaff();
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        await fetchStaff();
+      } catch (err) {
+        toast.error("Failed to load staff");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
-
-  // helpers
-  function mapServiceRow(row: any) {
-    return {
-      id: String(row.id),
-      name: row.name,
-      description: row.description ?? "",
-      duration_minutes: row.duration_minutes ?? 15,
-      price: row.price,
-      price_is_varies: row.price_is_varies,
-      is_active: !!row.is_active,
-      is_medical: row.is_medical,
-    } as Service;
-  }
-
-  async function fetchServices(): Promise<void> {
-    setLoading(true);
-    try {
-      const { data } = await api.get(`/tenants/${TENANT}/service`);
-      const rows = data?.data?.rows ?? [];
-      setServices(rows.map(mapServiceRow));
-    } catch (err) {
-      console.error("Error loading services:", err);
-      toast.error("Failed to load services");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   function normalizeStaffRow(r: any): Staff {
     // ensure schedule keys are strings "1".."7"
     const scheduleObj = r.schedule || {};
     const schedule: OpeningHours = Object.fromEntries(Object.entries(scheduleObj).map(([k, v]: any) => [String(k), v])) as OpeningHours;
+
+    // Handle multiple possible field names for service assignments (snake_case and camelCase)
+    const serviceAssignments = r.serviceAssignments ?? r.service_assignments ?? r.service_ids ?? [];
 
     return {
       id: String(r.id),
@@ -119,7 +105,8 @@ export default function StaffManagement() {
       phone: r.phone ?? "",
       isActive: r.isActive, // handle either shape
       schedule,
-      serviceAssignments: (r.serviceAssignments ?? []).map(String),
+      // Read service assignments from the response, but still compute from services as source of truth
+      serviceAssignments: Array.isArray(serviceAssignments) ? serviceAssignments.map(String) : [],
     };
   }
 
@@ -130,7 +117,6 @@ export default function StaffManagement() {
       const rows = data?.data?.rows ?? [];
       setStaff(rows.map(normalizeStaffRow));
     } catch (err) {
-      console.error("Error loading staff:", err);
       toast.error("Failed to load staff");
     } finally {
       setLoading(false);
@@ -144,22 +130,29 @@ export default function StaffManagement() {
     phone?: string;
     isActive: boolean;
     schedule: OpeningHours;
-    serviceAssignments: string[];
+    serviceAssignments?: string[]; // Service IDs to assign (general services only)
   }) {
     setLoading(true);
     try {
       const body = {
         ...payload,
         tenant_id: TENANT, // backend expects snake_case
+        // Convert service IDs to numbers if provided
+        serviceAssignments: payload.serviceAssignments?.map(Number),
       };
       const { data } = await api.post(`/tenants/${TENANT}/staff`, body);
       return data?.data ?? data;
     } catch (err) {
-      console.error("Error saving staff:", err);
       throw err;
     } finally {
       setLoading(false);
     }
+  }
+
+  // Helper: Get services assigned to a staff member
+  // Computes from services array (service.staff_ids is source of truth)
+  function getStaffServices(staffId: string): string[] {
+    return services.filter((s) => (s.staff_ids ?? []).includes(staffId)).map((s) => s.id);
   }
 
   async function deactivateStaff(staffId: string) {
@@ -170,7 +163,6 @@ export default function StaffManagement() {
       phone: "",
       isActive: false,
       schedule: DEFAULT_OPENING_HOURS,
-      serviceAssignments: [],
     });
   }
 
@@ -191,15 +183,20 @@ export default function StaffManagement() {
       return;
     }
     try {
+      // Send ALL service assignments to staff endpoint
+      // Backend will handle routing to appropriate tables (general services vs vaccines)
       await submitStaff({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         isActive: formData.isActive,
         schedule: formData.schedule,
-        serviceAssignments: formData.serviceAssignments,
+        serviceAssignments: formData.serviceAssignments, // ALL services (general + vaccines)
       });
+
       await fetchStaff();
+      clearCache();
+      await fetchServices(); // Refresh services to get updated staff_ids
       setShowAddModal(false);
       resetForm();
       toast.success("Staff member added successfully!");
@@ -209,13 +206,16 @@ export default function StaffManagement() {
   };
 
   const handleEditStaff = (staffMember: Staff) => {
+    // Get current service assignments from services array
+    const assignedServiceIds = getStaffServices(staffMember.id);
+
     setFormData({
       name: staffMember.name,
       email: staffMember.email,
       phone: staffMember.phone,
       isActive: staffMember.isActive,
       schedule: staffMember.schedule,
-      serviceAssignments: staffMember.serviceAssignments || [],
+      serviceAssignments: assignedServiceIds,
     });
     setEditingStaff(staffMember);
   };
@@ -227,6 +227,8 @@ export default function StaffManagement() {
       return;
     }
     try {
+      // Send ALL service assignments to staff endpoint
+      // Backend will handle routing to appropriate tables (general services vs vaccines)
       await submitStaff({
         id: Number(editingStaff.id),
         name: formData.name,
@@ -234,9 +236,12 @@ export default function StaffManagement() {
         phone: formData.phone,
         isActive: formData.isActive,
         schedule: formData.schedule,
-        serviceAssignments: formData.serviceAssignments,
+        serviceAssignments: formData.serviceAssignments, // ALL services (general + vaccines)
       });
+
       await fetchStaff();
+      clearCache();
+      await fetchServices(); // Refresh services to get updated staff_ids
       setEditingStaff(null);
       resetForm();
       toast.success("Staff member updated successfully!");
@@ -338,7 +343,10 @@ export default function StaffManagement() {
             </div>
           ) : (
             <div className="space-y-4">
-              {staff.map((staffMember) => (
+              {staff.map((staffMember) => {
+                const staffServices = getStaffServices(staffMember.id);
+
+                return (
                 <div key={staffMember.id} className="border rounded-lg p-4 bg-card">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -356,7 +364,7 @@ export default function StaffManagement() {
                         <div className="flex items-center gap-1 mt-1">
                           <Stethoscope className="h-3 w-3 text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">
-                            {(staffMember.serviceAssignments || []).length} services assigned
+                            {staffServices.length} services assigned
                           </span>
                         </div>
                       </div>
@@ -377,7 +385,8 @@ export default function StaffManagement() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </CardContent>

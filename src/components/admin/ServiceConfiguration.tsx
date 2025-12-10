@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,9 @@ import { Staff, DEFAULT_OPENING_HOURS } from "@/types/pharmacy";
 import { toast } from "sonner";
 import { TENANT } from "@/services/auth";
 import api from "@/services/axios";
+import { addVaccineToTenant, updateTenantVaccine, removeVaccineFromTenant, type AvailableVaccine } from "@/services/vaccineManagementApi";
+import { useServices } from "@/hooks/useServices";
+import { Service as BackendService } from "@/lib/types";
 
 type Service = {
   id: string;
@@ -25,11 +28,14 @@ type Service = {
   duration: number; // map from duration_minutes
   pricing: { type: "fixed" | "free" | "medication_additional"; amount?: number };
   isActive: boolean; // map from is_active
+  staffIds: string[]; // NEW: staff assignments from backend
 };
 
 export default function ServiceConfiguration() {
+  // Use the shared services hook for fetching and combining data (auto-fetch on mount)
+  const { services: backendServices, loading: servicesLoading, availableVaccines, fetchServices, clearCache } = useServices(true);
+
   const [loading, setLoading] = useState(false);
-  const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -47,50 +53,18 @@ export default function ServiceConfiguration() {
     description: "",
     isActive: true,
     assignedStaff: [] as string[],
+    selectedVaccineId: "", // For vaccine dropdown selection
   });
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const [{ data: svcData }, { data: stData }] = await Promise.all([
-          api.get(`/tenants/${TENANT}/service`),
-          api.get(`/tenants/${TENANT}/staff`),
-        ]);
-        if (!mounted) return;
-        const svcRows = svcData?.data?.rows ?? [];
-        const stRows = stData?.data?.rows ?? [];
-        setServices(svcRows.map(mapServiceRow));
-        // normalize staff to our FE shape (already same as in Staff page)
-        const normStaff: Staff[] = (stRows || []).map((r: any) => ({
-          id: String(r.id),
-          name: r.name,
-          email: r.email ?? "",
-          phone: r.phone ?? "",
-          isActive: !!(r.isActive ?? r.is_active),
-          schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
-          serviceAssignments: (r.serviceAssignments ?? []).map(String),
-        }));
-        setStaff(normStaff);
-      } catch (err) {
-        console.error("Failed to load services/staff:", err);
-        toast.error("Failed to load services and staff");
-      } finally {
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-  function mapServiceRow(row: any): Service {
-    const priceStr = (row.price ?? "").toString().trim();
-    const varies = !!row.price_is_varies;
+  // Convert backend service structure to UI-friendly structure
+  const mapBackendServiceToUI = (svc: BackendService): Service => {
+    const priceStr = (svc.price ?? "").toString().trim();
+    const varies = !!svc.price_is_varies;
 
     let pricing: Service["pricing"];
     if (varies) {
-      pricing = { type: "medication_additional" };
+      const amt = Number.parseFloat(priceStr);
+      pricing = { type: "medication_additional", amount: Number.isFinite(amt) ? amt : 0 };
     } else if (priceStr === "" || priceStr === "0" || priceStr === "0.00") {
       pricing = { type: "free", amount: 0 };
     } else {
@@ -99,15 +73,44 @@ export default function ServiceConfiguration() {
     }
 
     return {
-      id: String(row.id),
-      name: row.name,
-      description: row.description ?? "",
-      category: row.is_medical ? "vaccination" : "general",
-      duration: row.duration_minutes ?? 15,
+      id: svc.id,
+      name: svc.name,
+      description: svc.description,
+      category: svc.is_medical ? "vaccination" : "general",
+      duration: svc.duration_minutes,
       pricing,
-      isActive: !!row.is_active,
+      isActive: svc.is_active,
+      staffIds: svc.staff_ids,
     };
-  }
+  };
+
+  // Map backend services to UI-friendly format
+  const services = useMemo(() => {
+    return backendServices.map(mapBackendServiceToUI);
+  }, [backendServices]);
+
+  // Fetch staff on mount (services and vaccines are auto-fetched by the hook)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        if (mounted) {
+          await loadStaff();
+        }
+      } catch (err) {
+        console.error("Failed to load staff:", err);
+        toast.error("Failed to load staff");
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function toServiceUpsertBody(svc: {
     id?: string;
@@ -147,6 +150,27 @@ export default function ServiceConfiguration() {
     };
   }
 
+  // Helper function to load staff (vaccines are auto-loaded by the useServices hook)
+  const loadStaff = async () => {
+    try {
+      const { data } = await api.get(`/tenants/${TENANT}/staff`);
+      const stRows = data?.data?.rows ?? [];
+      const normStaff: Staff[] = (stRows || []).map((r: any) => ({
+        id: String(r.id),
+        name: r.name,
+        email: r.email ?? "",
+        phone: r.phone ?? "",
+        isActive: !!(r.isActive ?? r.is_active),
+        schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
+        serviceAssignments: [], // No longer needed - staff assignments now managed via services
+      }));
+      setStaff(normStaff);
+    } catch (err) {
+      console.error("Failed to load staff:", err);
+      throw err;
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -159,49 +183,65 @@ export default function ServiceConfiguration() {
       description: "",
       isActive: true,
       assignedStaff: [],
+      selectedVaccineId: "",
     });
   };
 
   const handleAddService = async () => {
-    if (!formData.name.trim()) return toast.error("Service name is required");
+    // For vaccines, validate vaccine selection
+    if (formData.category === "vaccination" && !formData.selectedVaccineId) {
+      return toast.error("Please select a vaccine");
+    }
+    // For general services, validate name
+    if (formData.category === "general" && !formData.name.trim()) {
+      return toast.error("Service name is required");
+    }
     if (formData.isActive && formData.assignedStaff.length === 0) {
       return toast.error("Active services must have at least one staff member assigned");
     }
 
     try {
       setLoading(true);
-      const body = toServiceUpsertBody({
-        name: formData.name,
-        description: formData.description,
-        category: formData.category,
-        duration: formData.duration,
-        pricing: formData.pricing,
-        isActive: formData.isActive,
-        assignedStaff: formData.assignedStaff,
-      });
-      const { data } = await api.post(`/tenants/${TENANT}/service`, body);
-      const savedId = String(data?.data?.id ?? data?.id);
-      // refresh lists from server for truth
-      const [{ data: svcData }, { data: stData }] = await Promise.all([
-        api.get(`/tenants/${TENANT}/service`),
-        api.get(`/tenants/${TENANT}/staff`),
-      ]);
-      setServices((svcData?.data?.rows ?? []).map(mapServiceRow));
-      setStaff(
-        (stData?.data?.rows ?? []).map((r: any) => ({
-          id: String(r.id),
-          name: r.name,
-          email: r.email ?? "",
-          phone: r.phone ?? "",
-          isActive: !!(r.isActive ?? r.is_active),
-          schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
-          serviceAssignments: (r.serviceAssignments ?? []).map(String),
-        }))
-      );
+
+      if (formData.category === "vaccination") {
+        // Add vaccine using vaccine management API
+        const price = formData.pricing.type !== "free" ? (formData.pricing.amount ?? 0).toFixed(2) : "0.00";
+        const priceIsVaries = formData.pricing.type === "medication_additional";
+
+        await addVaccineToTenant(TENANT, {
+          vaccineServiceId: formData.selectedVaccineId,
+          price,
+          priceIsVaries,
+          customDescription: formData.description.trim() || null,
+        });
+
+        // Update staff assignments via updateTenantVaccine
+        // Vaccine table is the source of truth
+        await updateTenantVaccine(TENANT, formData.selectedVaccineId, {
+          staffIds: formData.assignedStaff,
+        });
+      } else {
+        // Add general service using existing endpoint
+        const body = toServiceUpsertBody({
+          name: formData.name,
+          description: formData.description,
+          category: formData.category,
+          duration: formData.duration,
+          pricing: formData.pricing,
+          isActive: formData.isActive,
+          assignedStaff: formData.assignedStaff,
+        });
+        await api.post(`/tenants/${TENANT}/service`, body);
+      }
+
+      // Refresh data (clear cache to get fresh data)
+      clearCache();
+      await Promise.all([loadStaff(), fetchServices()]);
+
       setShowAddModal(false);
       resetForm();
       setHasChanges(true);
-      toast.success("Service added and staff assigned successfully!");
+      toast.success(formData.category === "vaccination" ? "Vaccine added successfully!" : "Service added successfully!");
     } catch (e) {
       console.error("Add service failed:", e);
       toast.error("Failed to add service");
@@ -211,8 +251,8 @@ export default function ServiceConfiguration() {
   };
 
   const handleEditService = (service: Service) => {
-    // Get current staff assignments for this service
-    const assignedStaffIds = staff.filter((s) => s.serviceAssignments.includes(service.id)).map((s) => s.id);
+    // Get current staff assignments from the service record
+    const assignedStaffIds = service.staffIds || [];
 
     setFormData({
       name: service.name,
@@ -225,51 +265,57 @@ export default function ServiceConfiguration() {
       description: service.description,
       isActive: service.isActive,
       assignedStaff: assignedStaffIds,
+      selectedVaccineId: "", // Not used when editing
     });
     setEditingService(service);
   };
 
   const handleUpdateService = async () => {
     if (!editingService) return;
-    if (!formData.name.trim()) return toast.error("Service name is required");
-    // if (formData.isActive && formData.assignedStaff.length === 0) {
-    //   return toast.error("Active services must have at least one staff member assigned");
-    // }
+    if (formData.category === "general" && !formData.name.trim()) {
+      return toast.error("Service name is required");
+    }
 
     try {
       setLoading(true);
-      const body = toServiceUpsertBody({
-        id: editingService.id,
-        name: formData.name,
-        description: formData.description,
-        category: formData.category,
-        duration: formData.duration,
-        pricing: formData.pricing,
-        isActive: formData.isActive,
-        assignedStaff: formData.assignedStaff,
-      });
-      await api.post(`/tenants/${TENANT}/service`, body);
-      // refresh from server
-      const [{ data: svcData }, { data: stData }] = await Promise.all([
-        api.get(`/tenants/${TENANT}/service`),
-        api.get(`/tenants/${TENANT}/staff`),
-      ]);
-      setServices((svcData?.data?.rows ?? []).map(mapServiceRow));
-      setStaff(
-        (stData?.data?.rows ?? []).map((r: any) => ({
-          id: String(r.id),
-          name: r.name,
-          email: r.email ?? "",
-          phone: r.phone ?? "",
-          isActive: !!(r.isActive ?? r.is_active),
-          schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
-          serviceAssignments: (r.serviceAssignments ?? []).map(String),
-        }))
-      );
+
+      if (formData.category === "vaccination") {
+        // Update vaccine using vaccine management API
+        const price = formData.pricing.type !== "free" ? (formData.pricing.amount ?? 0).toFixed(2) : "0.00";
+        const priceIsVaries = formData.pricing.type === "medication_additional";
+
+        // Update vaccine via vaccine API (includes staff assignments)
+        // Vaccine table is the source of truth
+        await updateTenantVaccine(TENANT, editingService.id, {
+          price,
+          priceIsVaries,
+          customDescription: formData.description.trim() || null,
+          isActive: formData.isActive,
+          staffIds: formData.assignedStaff,
+        });
+      } else {
+        // Update general service using existing endpoint
+        const body = toServiceUpsertBody({
+          id: editingService.id,
+          name: formData.name,
+          description: formData.description,
+          category: formData.category,
+          duration: formData.duration,
+          pricing: formData.pricing,
+          isActive: formData.isActive,
+          assignedStaff: formData.assignedStaff,
+        });
+        await api.post(`/tenants/${TENANT}/service`, body);
+      }
+
+      // Refresh data (clear cache to get fresh data)
+      clearCache();
+      await Promise.all([loadStaff(), fetchServices()]);
+
       setEditingService(null);
       resetForm();
       setHasChanges(true);
-      toast.success("Service updated successfully!");
+      toast.success(formData.category === "vaccination" ? "Vaccine updated successfully!" : "Service updated successfully!");
     } catch (e) {
       console.error("Update service failed:", e);
       toast.error("Failed to update service");
@@ -279,29 +325,27 @@ export default function ServiceConfiguration() {
   };
 
   const handleDeleteService = async (serviceId: string) => {
+    const service = services.find((s) => s.id === serviceId);
+    if (!service) return;
+
     if (!confirm("Are you sure you want to remove this service?")) return;
     try {
       setLoading(true);
-      await api.delete(`/tenants/${TENANT}/service/${serviceId}`);
-      // refresh from server
-      const [{ data: svcData }, { data: stData }] = await Promise.all([
-        api.get(`/tenants/${TENANT}/service`),
-        api.get(`/tenants/${TENANT}/staff`),
-      ]);
-      setServices((svcData?.data?.rows ?? []).map(mapServiceRow));
-      setStaff(
-        (stData?.data?.rows ?? []).map((r: any) => ({
-          id: String(r.id),
-          name: r.name,
-          email: r.email ?? "",
-          phone: r.phone ?? "",
-          isActive: !!(r.isActive ?? r.is_active),
-          schedule: r.schedule ?? DEFAULT_OPENING_HOURS,
-          serviceAssignments: (r.serviceAssignments ?? []).map(String),
-        }))
-      );
+
+      if (service.category === "vaccination") {
+        // Deactivate vaccine using vaccine management API
+        await removeVaccineFromTenant(TENANT, serviceId);
+      } else {
+        // Delete general service using existing endpoint
+        await api.delete(`/tenants/${TENANT}/service/${serviceId}`);
+      }
+
+      // Refresh data (clear cache to get fresh data)
+      clearCache();
+      await Promise.all([loadStaff(), fetchServices()]);
+
       setHasChanges(true);
-      toast.success("Service removed");
+      toast.success(service.category === "vaccination" ? "Vaccine removed" : "Service removed");
     } catch (e) {
       console.error("Delete service failed:", e);
       toast.error("Failed to remove service");
@@ -329,7 +373,13 @@ export default function ServiceConfiguration() {
 
   // Get staff count for a service
   const getServiceStaffCount = (serviceId: string) => {
-    return staff.filter((s) => s.serviceAssignments.includes(serviceId) && s.isActive).length;
+    const service = services.find((s) => s.id === serviceId);
+    if (!service) return 0;
+    // Count how many of the assigned staff are active
+    return service.staffIds.filter((staffId) => {
+      const staffMember = staff.find((s) => s.id === staffId);
+      return staffMember && staffMember.isActive;
+    }).length;
   };
 
   // Get active staff members
@@ -451,9 +501,19 @@ export default function ServiceConfiguration() {
                 {services.length} total services • {getActiveServicesCount()} active
               </p>
             </div>
-            <Button onClick={() => setShowAddModal(true)} className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                // Set initial category based on active tab
+                setFormData({
+                  ...formData,
+                  category: activeTab as "vaccination" | "general",
+                });
+                setShowAddModal(true);
+              }}
+              className="flex items-center gap-2"
+            >
               <Plus className="h-4 w-4" />
-              Add Service
+              Add {activeTab === "vaccination" ? "Vaccine" : "Service"}
             </Button>
           </div>
         </CardHeader>
@@ -496,11 +556,93 @@ export default function ServiceConfiguration() {
       >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingService ? "Edit Service" : "Add Custom Service"}</DialogTitle>
+            <DialogTitle>
+              {editingService
+                ? editingService.category === "vaccination"
+                  ? "Edit Vaccine"
+                  : "Edit Service"
+                : formData.category === "vaccination"
+                ? "Add Vaccine"
+                : "Add Service"}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Show category selector only when adding, not editing */}
+            {!editingService && (
+              <div>
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value: "vaccination" | "general") => {
+                    setFormData({
+                      ...formData,
+                      category: value,
+                      selectedVaccineId: "",
+                      name: "",
+                      description: "",
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border border-border z-50">
+                    <SelectItem value="vaccination">Vaccination</SelectItem>
+                    <SelectItem value="general">General Service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* For vaccines when adding - show dropdown */}
+            {!editingService && formData.category === "vaccination" && (
+              <div>
+                <Label htmlFor="vaccineSelect">Select Vaccine *</Label>
+                <Select
+                  value={formData.selectedVaccineId}
+                  onValueChange={(vaccineId) => {
+                    const selectedVaccine = availableVaccines.find((v) => v.id === vaccineId);
+                    if (selectedVaccine) {
+                      setFormData({
+                        ...formData,
+                        selectedVaccineId: vaccineId,
+                        name: selectedVaccine.name,
+                        description: selectedVaccine.description, // Pre-fill with default
+                        duration: 15, // Always use 15 minutes for vaccines
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a vaccine" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border border-border z-50">
+                    {availableVaccines
+                      .filter((v) => !v.isLinked) // Only show vaccines not yet added
+                      .map((vaccine) => (
+                        <SelectItem key={vaccine.id} value={vaccine.id}>
+                          {vaccine.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Select from shared vaccine pool. Recommendation rules are managed globally.
+                </p>
+              </div>
+            )}
+
+            {/* For vaccines when editing OR after selection - show name (read-only) */}
+            {formData.category === "vaccination" && (editingService || formData.selectedVaccineId) && (
+              <div>
+                <Label htmlFor="vaccineName">Vaccine Name</Label>
+                <Input id="vaccineName" value={formData.name} disabled className="bg-muted" />
+              </div>
+            )}
+
+            {/* For general services - show editable name */}
+            {formData.category === "general" && (
               <div>
                 <Label htmlFor="serviceName">Service Name *</Label>
                 <Input
@@ -516,174 +658,176 @@ export default function ServiceConfiguration() {
                   required
                 />
               </div>
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value: "vaccination" | "general") =>
-                    setFormData({
-                      ...formData,
-                      category: value,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border border-border z-50">
-                    <SelectItem value="vaccination">Vaccination</SelectItem>
-                    <SelectItem value="general">General Service</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            )}
 
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    description: e.target.value,
-                  })
-                }
-                placeholder="Service description"
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            {/* Show description field only after vaccine is selected OR for general services OR when editing */}
+            {(formData.category === "general" || formData.selectedVaccineId || editingService) && (
               <div>
-                <Label htmlFor="duration">Duration (minutes)</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min="5"
-                  max="120"
-                  value={formData.duration}
-                  disabled={true}
+                <Label htmlFor="description">Description{formData.category === "vaccination" && " (Optional - Override Default)"}</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      duration: parseInt(e.target.value) || 15,
+                      description: e.target.value,
                     })
                   }
+                  placeholder={
+                    formData.category === "vaccination" ? "Customize description or leave to use default" : "Service description"
+                  }
+                  rows={3}
                 />
-              </div>
-              <div>
-                <Label htmlFor="pricingType">Pricing Type</Label>
-                <Select
-                  value={formData.pricing.type}
-                  onValueChange={(value: "fixed" | "free" | "medication_additional") =>
-                    setFormData({
-                      ...formData,
-                      pricing: {
-                        ...formData.pricing,
-                        type: value,
-                      },
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border border-border z-50">
-                    <SelectItem value="fixed">Fixed Price</SelectItem>
-                    <SelectItem value="free">Free</SelectItem>
-                    <SelectItem value="medication_additional">Varies</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {formData.pricing.type === "fixed" && (
-              <div>
-                <Label htmlFor="amount">Price ($)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.pricing.amount || 0}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      pricing: {
-                        ...formData.pricing,
-                        amount: parseFloat(e.target.value) || 0,
-                      },
-                    })
-                  }
-                />
+                {formData.category === "vaccination" && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Leave empty to use the default shared description. Custom descriptions are tenant-specific.
+                  </p>
+                )}
               </div>
             )}
 
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.isActive}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      isActive: checked,
-                    })
-                  }
-                />
-                <Label>Active Service (Available for Online Booking)</Label>
-              </div>
-            </div>
+            {/* Show pricing and duration only after vaccine is selected OR for general services OR when editing */}
+            {(formData.category === "general" || formData.selectedVaccineId || editingService) && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="duration">Duration (minutes)</Label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      min="5"
+                      max="120"
+                      value={formData.category === "vaccination" ? 15 : formData.duration}
+                      disabled={formData.category === "vaccination"} // Vaccines always use 15 minutes
+                      className={formData.category === "vaccination" ? "bg-muted" : ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          duration: parseInt(e.target.value) || 15,
+                        })
+                      }
+                    />
+                    {formData.category === "vaccination" && (
+                      <p className="text-xs text-muted-foreground mt-1">Duration is fixed at 15 minutes for all vaccines.</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="pricingType">Pricing Type</Label>
+                    <Select
+                      value={formData.pricing.type}
+                      disabled={formData.category === "vaccination"} // Always disabled for vaccines
+                      onValueChange={(value: "fixed" | "free" | "medication_additional") =>
+                        setFormData({
+                          ...formData,
+                          pricing: {
+                            ...formData.pricing,
+                            type: value,
+                          },
+                        })
+                      }
+                    >
+                      <SelectTrigger className={formData.category === "vaccination" ? "bg-muted" : ""}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border border-border z-50">
+                        <SelectItem value="fixed">Fixed Price</SelectItem>
+                        <SelectItem value="free">Free</SelectItem>
+                        <SelectItem value="medication_additional">Varies</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {formData.category === "vaccination" && (
+                      <p className="text-xs text-muted-foreground mt-1">Pricing type is managed at the shared vaccine level.</p>
+                    )}
+                  </div>
+                </div>
 
-            {/* Staff Assignment Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-base font-medium">Assign Staff Members</Label>
-                  <p className="text-sm text-muted-foreground">Select which staff members can provide this service</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={handleSelectAllStaff} disabled={getActiveStaff().length === 0}>
-                    Select All
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={handleClearAllStaff}>
-                    Clear All
-                  </Button>
-                </div>
-              </div>
+                {formData.pricing.type !== "free" && (
+                  <div>
+                    <Label htmlFor="amount">Price ($)</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.pricing.amount || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          pricing: {
+                            ...formData.pricing,
+                            amount: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                )}
 
-              {getActiveStaff().length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground border rounded-lg">
-                  <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No active staff members available</p>
-                  <p className="text-xs">Add staff members in the Staff Management section</p>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={formData.isActive}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          isActive: checked,
+                        })
+                      }
+                    />
+                    <Label>Active Service (Available for Online Booking)</Label>
+                  </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-lg p-3">
-                  {getActiveStaff().map((staffMember) => (
-                    <div key={staffMember.id} className="flex items-center space-x-3 p-2 border rounded-lg bg-card">
-                      <Checkbox
-                        id={`staff-${staffMember.id}`}
-                        checked={formData.assignedStaff.includes(staffMember.id)}
-                        onCheckedChange={(checked) => handleStaffToggle(staffMember.id, checked as boolean)}
-                      />
-                      <div className="flex-1">
-                        <Label htmlFor={`staff-${staffMember.id}`} className="text-sm font-medium cursor-pointer">
-                          {staffMember.name}
-                        </Label>
-                      </div>
+
+                {/* Staff Assignment Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-medium">Assign Staff Members</Label>
+                      <p className="text-sm text-muted-foreground">Select which staff members can provide this service</p>
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAllStaff}
+                        disabled={getActiveStaff().length === 0}
+                      >
+                        Select All
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={handleClearAllStaff}>
+                        Clear All
+                      </Button>
+                    </div>
+                  </div>
 
-              {/* {formData.isActive && formData.assignedStaff.length === 0 && (
-                <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                  <p className="text-sm text-destructive">Active services must have at least one staff member assigned</p>
+                  {getActiveStaff().length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                      <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No active staff members available</p>
+                      <p className="text-xs">Add staff members in the Staff Management section</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-lg p-3">
+                      {getActiveStaff().map((staffMember) => (
+                        <div key={staffMember.id} className="flex items-center space-x-3 p-2 border rounded-lg bg-card">
+                          <Checkbox
+                            id={`staff-${staffMember.id}`}
+                            checked={formData.assignedStaff.includes(staffMember.id)}
+                            onCheckedChange={(checked) => handleStaffToggle(staffMember.id, checked as boolean)}
+                          />
+                          <div className="flex-1">
+                            <Label htmlFor={`staff-${staffMember.id}`} className="text-sm font-medium cursor-pointer">
+                              {staffMember.name}
+                            </Label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )} */}
-            </div>
+              </>
+            )}
 
             <div className="flex justify-end space-x-2">
               <Button

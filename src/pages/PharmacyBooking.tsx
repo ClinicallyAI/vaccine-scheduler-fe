@@ -10,6 +10,8 @@ import ServiceTypeSelection from "@/components/ServiceTypeSelection";
 import BasicInfoForm from "@/components/BasicInfoForm";
 import PrivacyConsentStep from "@/components/PrivacyConsentStep";
 import ServiceSelection from "@/components/ServiceSelection";
+import ServiceSelectionWithRecommendations from "@/components/ServiceSelectionWithRecommendations";
+import { getBirthYear } from "@/services/vaccineRecommendationsApi";
 import AppointmentBooking from "@/components/AppointmentBooking";
 import DetailedContactForm from "@/components/DetailedContactForm";
 import SimpleContactForm from "@/components/SimpleContactForm";
@@ -255,12 +257,14 @@ const PharmacyBooking = () => {
           );
         case 3:
           return (
-            <ServiceSelection
+            <ServiceSelectionWithRecommendations
               services={getFilteredServices()}
               onSelectService={handleSelectServiceWithRecommendations}
               onPrevStep={handlePrevStep}
-              age={formData.calculatedAge}
+              dateOfBirth={formData.personalInfo.dateOfBirth}
+              isPregnant={formData.personalInfo.isPregnantOrBreastfeeding}
               serviceType={serviceType}
+              tenantId={pharmacy?.id || ""}
             />
           );
         case 4:
