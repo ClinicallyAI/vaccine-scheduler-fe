@@ -8,7 +8,6 @@ import { ArrowLeft, Clock, DollarSign, ChevronDown, ChevronUp, Info } from "luci
 import { Service } from "@/lib/types";
 import { getVaccineRecommendations, RecommendedService } from "@/services/vaccineRecommendationsApi";
 import { toast } from "sonner";
-import { TENANT } from "@/services/auth";
 
 interface ServiceSelectionWithRecommendationsProps {
   services: Service[];
@@ -164,6 +163,42 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
     return status === "fees_apply";
   };
 
+  const renderServiceCardWithOutRecommendation = (service: RecommendedService | Service, showBadge: boolean) => {
+    return (
+      <Card key={service.id} className="border border-gray-200">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-3 flex-1">
+              <Checkbox
+                id={service.id}
+                checked={selectedServices.includes(service.id)}
+                onCheckedChange={() => handleServiceToggle(service.id)}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <label htmlFor={service.id} className="cursor-pointer">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-semibold text-lg">{service.name}</h3>
+                    {service.price && (
+                      <Badge variant="secondary" className="flex items-center gap-1">
+                        {service.price_is_varies ? "Varies" : Number(service.price) === 0 ? "Free" : `$${service.price}`}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-gray-600 mb-2">{service.description}</p>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Clock className="h-4 w-4 mr-1" />
+                    {service.duration_minutes} minutes
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderServiceCard = (service: RecommendedService | Service, showBadge: boolean) => {
     const recommendationStatus = "recommendationStatus" in service ? service.recommendationStatus : undefined;
 
@@ -233,7 +268,7 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
           <CardTitle className="text-3xl font-bold">{serviceType === "vaccinations" ? "Select Vaccinations" : "Select Services"}</CardTitle>
         </CardHeader>
         <CardContent>
-          {(TENANT === "2" || TENANT === "10") &&
+          {(tenantId === 2 || tenantId === 10) &&
             (serviceType === "vaccinations" ? (
               <>
                 {/* Empty State - No Recommendations */}
@@ -291,8 +326,8 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
               <div className="space-y-4">{services.map((service) => renderServiceCard(service, false))}</div>
             ))}
 
-          {!(TENANT === "2" || TENANT === "10") && (
-            <div className="space-y-4">{services.map((service) => renderServiceCard(service, false))}</div>
+          {!(tenantId === 2 || tenantId === 10) && (
+            <div className="space-y-4">{services.map((service) => renderServiceCardWithOutRecommendation(service, false))}</div>
           )}
 
           <div className="flex justify-between pt-6">
