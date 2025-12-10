@@ -100,7 +100,7 @@ export function useServices(autoFetch: boolean = false) {
     const fetchPromise = (async () => {
       try {
         // For tenant 2, use the new vaccine structure
-        if (TENANT === 2) {
+        if (TENANT === 2 || TENANT === 10) {
           const [availableVaccinesResult, tenantVaccinesResult, servicesResult] = await Promise.allSettled([
             getAvailableVaccines(TENANT),
             getTenantVaccines(TENANT),
