@@ -122,7 +122,7 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
   }, [dateOfBirth, isPregnant, serviceType, tenantId]);
 
   const handleServiceToggle = (serviceId: string) => {
-    setSelectedServices((prev) => (prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId]));
+    setSelectedServices((prev) => (prev.includes(serviceId) ? [] : [serviceId]));
   };
 
   const handleContinue = () => {
