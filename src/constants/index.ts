@@ -42,6 +42,8 @@ export const MULTIPLE_VACCINE_SERVICE_IDS = [SERVICE_IDS.FLU, SERVICE_IDS.COVID]
 // Tenant/Pharmacy IDs
 // ========================================
 export const TENANT_IDS = {
+  UNICHEM_PAKURANGA: 1,
+  DEMO: 2,
   VERCOE_ROAD: 3,
   UNICHEM_MILFORD: 4,
   DEVONPORT_7_DAY: 5,
@@ -88,6 +90,15 @@ export const BLOCKED_NZ_DATES = [
   "2025-12-25", // Christmas Day
   "2026-01-01", // New Year's Day
   "2026-01-02", // Day after New Year's
+  "2026-01-26", // Auckland Anniversary Day
+  "2026-02-06", // Waitangi
+  "2026-04-03", // Good Friday
+  "2026-04-05", // Easter Sunday
+  "2026-04-06", // Easter Monday
+  "2026-04-27", // ANZAC Day
+  "2026-06-01", // King's Birthday
+  "2026-07-10", // Matariki
+  "2026-10-26", // Labour Day
 ] as const;
 
 // Holiday opening windows per tenant
@@ -106,5 +117,15 @@ export const HOLIDAY_OPEN_WINDOWS: Record<string, Record<number, [string, string
   },
   "2026-01-02": {
     [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-01-26": {
+    [TENANT_IDS.DEMO]: [["09:00", "15:00"]],
+    [TENANT_IDS.VERCOE_ROAD]: [["08:30", "17:30"]],
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["09:00", "19:00"]],
+    [TENANT_IDS.MANGAWHAI]: [["09:00", "17:30"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["08:00", "19:00"]],
+    [TENANT_IDS.UNICHEM_PUTARURU]: [["09:00", "17:00"]],
+    [TENANT_IDS.GILMOURS_HAVELOCK_NORTH]: [["08:30", "18:00"]],
+    [TENANT_IDS.IPG_PHARMACY]: [["09:00", "17:00"]],
   },
 } as const;

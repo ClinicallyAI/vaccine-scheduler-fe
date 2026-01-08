@@ -1,12 +1,6 @@
 import { format, getHours, getMinutes, getDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import {
-  NZ_TIMEZONE,
-  BLOCKED_NZ_DATES,
-  HOLIDAY_OPEN_WINDOWS,
-  TENANT_IDS,
-  TENANT_4_SATURDAY_ALLOWED_SERVICE_IDS
-} from "@/constants";
+import { NZ_TIMEZONE, BLOCKED_NZ_DATES, HOLIDAY_OPEN_WINDOWS, TENANT_IDS, TENANT_4_SATURDAY_ALLOWED_SERVICE_IDS } from "@/constants";
 
 const NZ_TZ = NZ_TIMEZONE;
 const BLOCKED_NZ_DATES_SET = new Set<string>(BLOCKED_NZ_DATES);
@@ -28,7 +22,7 @@ export function flagLunchAsUnavailable(availability, tenantId, serviceId) {
     ...day,
     timeSlots: day.timeSlots.map((ts) => {
       const start = toZonedTime(new Date(ts.startTime), NZ_TZ);
-      const nzDate = format(start, 'yyyy-MM-dd'); // "YYYY-MM-DD"
+      const nzDate = format(start, "yyyy-MM-dd"); // "YYYY-MM-DD"
       const minutes = getHours(start) * 60 + getMinutes(start);
 
       // --- Holiday rules (apply to ALL tenants first) ---
