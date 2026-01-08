@@ -165,7 +165,9 @@ const EditPatientModal = ({ open, record, services, onClose, onUpdate }: EditPat
 
             {/* DOB with Day / Month / Year selects */}
             <div className="space-y-3">
-              <Label className="text-base font-medium">Date of Birth <span className="text-gray-500 font-normal">(optional)</span></Label>
+              <Label className="text-base font-medium">
+                Date of Birth <span className="text-gray-500 font-normal">(optional)</span>
+              </Label>
               <div className="grid grid-cols-[1fr_2fr_1fr] gap-2">
                 {/* Day */}
                 <Select

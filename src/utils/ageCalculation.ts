@@ -84,7 +84,7 @@ export function calculateAge(day: string, month: string, year: string): AgeCalcu
       }
 
       // Calculate remaining weeks after accounting for full months
-      const monthStart = new Date(today.getFullYear(), today.getMonth() - months, dob.getDate());
+      const monthStart = new Date(dob.getFullYear(), dob.getMonth() + months, dob.getDate());
       const remainingDays = Math.floor((today.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24));
       const weeks = Math.floor(remainingDays / 7);
 
