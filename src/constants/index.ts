@@ -98,7 +98,10 @@ export const BLOCKED_NZ_DATES = [
   "2026-04-27", // ANZAC Day
   "2026-06-01", // King's Birthday
   "2026-07-10", // Matariki
+  "2026-10-23", // Hawke's Bay Anniversary Day
   "2026-10-26", // Labour Day
+  "2026-12-25", // Christmas Day
+  "2026-12-28", // Boxing Day
 ] as const;
 
 // Holiday opening windows per tenant
@@ -120,12 +123,59 @@ export const HOLIDAY_OPEN_WINDOWS: Record<string, Record<number, [string, string
   },
   "2026-01-26": {
     [TENANT_IDS.DEMO]: [["09:00", "15:00"]],
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["08:00", "19:00"]],
+    [TENANT_IDS.GILMOURS_HAVELOCK_NORTH]: [["08:30", "18:00"]],
+    [TENANT_IDS.IPG_PHARMACY]: [["09:00", "17:00"]],
+  },
+  "2026-02-06": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-04-03": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-04-05": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-04-06": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-04-27": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-06-01": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-07-10": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-10-26": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-10-23": {
+    [TENANT_IDS.DEMO]: [["09:00", "15:00"]],
+    [TENANT_IDS.UNICHEM_MILFORD]: [["08:30", "17:30"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+    [TENANT_IDS.UNICHEM_PAKURANGA]: [["08:30", "17:30"]],
     [TENANT_IDS.VERCOE_ROAD]: [["08:30", "17:30"]],
     [TENANT_IDS.DEVONPORT_7_DAY]: [["09:00", "19:00"]],
     [TENANT_IDS.MANGAWHAI]: [["09:00", "17:30"]],
-    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["08:00", "19:00"]],
     [TENANT_IDS.UNICHEM_PUTARURU]: [["09:00", "17:00"]],
-    [TENANT_IDS.GILMOURS_HAVELOCK_NORTH]: [["08:30", "18:00"]],
     [TENANT_IDS.IPG_PHARMACY]: [["09:00", "17:00"]],
+  },
+  "2026-12-25": {
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
+  },
+  "2026-12-28": {
+    [TENANT_IDS.DEVONPORT_7_DAY]: [["10:00", "16:00"]],
+    [TENANT_IDS.UNICHEM_RUSSELL_STREET]: [["09:00", "15:00"]],
   },
 } as const;
