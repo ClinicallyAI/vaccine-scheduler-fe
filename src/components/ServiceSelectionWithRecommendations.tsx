@@ -61,6 +61,20 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
   const safeRecommended = Array.isArray(recommended) ? recommended : [];
   const safeOthers = Array.isArray(others) ? others : [];
 
+  // Sort recommended services by status priority: funded -> fees_apply -> eligibility_confirmed
+  const sortedRecommended = [...safeRecommended].sort((a, b) => {
+    const statusPriority: Record<string, number> = {
+      funded: 1,
+      fees_apply: 2,
+      eligibility_confirmed: 3,
+    };
+
+    const aPriority = statusPriority[a.recommendationStatus] || 999;
+    const bPriority = statusPriority[b.recommendationStatus] || 999;
+
+    return aPriority - bPriority;
+  });
+
   // Fetch recommendations
   useEffect(() => {
     async function fetchRecommendations() {
@@ -136,11 +150,11 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
   const getBadgeVariant = (status: string) => {
     switch (status) {
       case "funded":
-        return "default";
+        return "default"; // green
       case "fees_apply":
-        return "secondary";
+        return "secondary"; // grey
       case "eligibility_confirmed":
-        return "outline";
+        return "warning"; // orange
       default:
         return "outline";
     }
@@ -231,7 +245,8 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs">
                             <p>
-                              You meet the age criteria. Your vaccinator will confirm clinical and funding eligibility at your appointment.
+                              You meet the basic criteria. Your vaccinator will confirm clinical and funding eligibility at your
+                              appointment.
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -272,7 +287,7 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
             (serviceType === "vaccinations" ? (
               <>
                 {/* Empty State - No Recommendations */}
-                {safeRecommended.length === 0 && (
+                {sortedRecommended.length === 0 && (
                   <div className="mb-6 p-6 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/30">
                     <div className="text-center space-y-3">
                       <div className="flex justify-center">
@@ -291,14 +306,14 @@ const ServiceSelectionWithRecommendations: React.FC<ServiceSelectionWithRecommen
                 )}
 
                 {/* Recommended Section */}
-                {safeRecommended.length > 0 && (
+                {sortedRecommended.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-xl font-semibold mb-2 text-foreground">Recommendations</h3>
                     <p className="text-sm text-foreground/70 mb-4" role="note">
-                      Based on age and pregnancy status. Your vaccinating pharmacist will determine the final clinical and funding
-                      eligibility.
+                      This is a general guide based only on age and pregnancy status. Your vaccinating pharmacist will determine the final
+                      clinical and funding eligibility.
                     </p>
-                    <div className="space-y-4">{safeRecommended.map((service) => renderServiceCard(service, true))}</div>
+                    <div className="space-y-4">{sortedRecommended.map((service) => renderServiceCard(service, true))}</div>
                   </div>
                 )}
 
