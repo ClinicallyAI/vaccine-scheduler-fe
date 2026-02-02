@@ -22,41 +22,83 @@ const queryClient = new QueryClient();
 const App = () => {
   useVersionCheck();
   return (
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route
-                path="/clinically-home"
-                element={
-                  <PrivateRoute>
-                    <ClinicallyHome />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="/" element={<Index />} />
-              <Route path="/pharmacy/:name" element={<PharmacyBooking />} />
-              <Route path="/pharmacy/reschedule/:token" element={<RescheduleBooking />} />
-              <Route path="/pharmacy/cancel/:token" element={<CancelBooking />} />
-              <Route
-                path="/clinically-home/admin-setup"
-                element={
-                  <PrivateRoute>
-                    <PharmacySetUp />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </React.StrictMode>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#f8fafc",
+        padding: "20px",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: "white",
+          padding: "48px",
+          borderRadius: "12px",
+          boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+          maxWidth: "500px",
+        }}
+      >
+        <h1
+          style={{
+            fontSize: "24px",
+            fontWeight: "600",
+            color: "#1e293b",
+            marginBottom: "16px",
+          }}
+        >
+          Service No Longer Available
+        </h1>
+        <p
+          style={{
+            fontSize: "16px",
+            color: "#64748b",
+            lineHeight: "1.6",
+          }}
+        >
+          This booking service is no longer active. Thank you for your interest.
+        </p>
+      </div>
+    </div>
+    // <React.StrictMode>
+    //   <QueryClientProvider client={queryClient}>
+    //     <TooltipProvider>
+    //       <Toaster />
+    //       <Sonner />
+    //       <BrowserRouter>
+    //         <Routes>
+    //           <Route path="/login" element={<Login />} />
+    //           <Route
+    //             path="/clinically-home"
+    //             element={
+    //               <PrivateRoute>
+    //                 <ClinicallyHome />
+    //               </PrivateRoute>
+    //             }
+    //           />
+    //           <Route path="/" element={<Index />} />
+    //           <Route path="/pharmacy/:name" element={<PharmacyBooking />} />
+    //           <Route path="/pharmacy/reschedule/:token" element={<RescheduleBooking />} />
+    //           <Route path="/pharmacy/cancel/:token" element={<CancelBooking />} />
+    //           <Route
+    //             path="/clinically-home/admin-setup"
+    //             element={
+    //               <PrivateRoute>
+    //                 <PharmacySetUp />
+    //               </PrivateRoute>
+    //             }
+    //           />
+    //           <Route path="/admin" element={<AdminDashboard />} />
+    //           <Route path="*" element={<NotFound />} />
+    //         </Routes>
+    //       </BrowserRouter>
+    //     </TooltipProvider>
+    //   </QueryClientProvider>
+    // </React.StrictMode>
   );
 };
 
